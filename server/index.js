@@ -6,23 +6,26 @@ import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 
 const PORT = Number(process.env.PORT || 8787);
-const HOST = process.env.HOST || "0.0.0.0";
+const HOST = process.env.HOST || "127.0.0.1";
 const GROK_HOME = process.env.GROK_HOME || join(homedir(), ".grok");
 const MAX_BODY = 2 * 1024 * 1024;
 
 mkdirSync(GROK_HOME, { recursive: true });
 
-function corsHeaders() {
+function corsHeaders(origin) {
+  const allowed = (process.env.CORS_ORIGIN || "https://methatsmeyesitsme.github.io").split(",").map(x => x.trim()).filter(Boolean);
+  const isLocal = /^https?:\\/\\/(localhost|127\\.0\\.0\\.1)(?::\\d+)?$/.test(origin || "");
+  const allow = allowed.includes("*") || allowed.includes(origin) || isLocal ? (origin || allowed[0] || "null") : "null";
   return {
-    "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
+    "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Content-Type": "application/json; charset=utf-8"
   };
 }
 
-function send(res, status, body) {
-  res.writeHead(status, corsHeaders());
+function send(res, status, body, origin) {
+  res.writeHead(status, corsHeaders(origin));
   res.end(JSON.stringify(body));
 }
 
@@ -147,7 +150,7 @@ async function chat(res, body) {
   const chatId = String(body.chatId || randomUUID());
   const effort = String(body.effort || "medium");
 
-  if (!prompt) return send(res, 400, { error: "prompt is required." });
+  if (!prompt) return send(res, 400, { error: "prompt is required." }, origin);
 
   if (!(await isAuthenticated())) {
     return send(res, 401, { error: "Grok is not connected. Connect your Grok account first." });
@@ -181,18 +184,18 @@ async function chat(res, body) {
       model: "grok-4.7"
     });
   } catch (error) {
-    send(res, 500, { error: error.message || "Grok request failed." });
+    send(res, 500, { error: error.message || "Grok request failed." }, origin);
   }
 }
 
-async function route(req, res) {
+async function route(req, res) {\n  const origin = req.headers.origin || "";
   if (req.method === "OPTIONS") {
-    res.writeHead(204, corsHeaders());
+    res.writeHead(204, corsHeaders(origin));
     return res.end();
   }
 
   if (req.url === "/api/health" && req.method === "GET") {
-    return send(res, 200, { ok: true, provider: "Grok", apiKeyRequired: false });
+    return send(res, 200, { ok: true, provider: "Grok", apiKeyRequired: false }, origin);
   }
 
   if (req.url === "/api/grok/status" && req.method === "GET") {
@@ -213,7 +216,7 @@ async function route(req, res) {
       await run("grok", ["logout"], { timeout: 30_000 });
       return send(res, 200, { authenticated: false });
     } catch (error) {
-      return send(res, 500, { error: error.message || "Grok logout failed." });
+      return send(res, 500, { error: error.message || "Grok logout failed." }, origin);
     }
   }
 
@@ -229,7 +232,7 @@ async function route(req, res) {
 }
 
 const server = http.createServer((req, res) => {
-  route(req, res).catch(error => send(res, 500, { error: error.message || "Server error." }));
+  route(req, res).catch(error => send(res, 500, { error: error.message || "Server error." }), origin);
 });
 
 server.listen(PORT, HOST, () => {
