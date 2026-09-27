@@ -83,6 +83,20 @@ function Send-Json($Context,[int]$Status,$Object){
   $Context.Response.OutputStream.Write($bytes,0,$bytes.Length)
   $Context.Response.Close()
 }
+function Send-File($Context,[string]$FilePath,[string]$DownloadName){
+  Set-Cors $Context.Response $Context.Request.Headers["Origin"]
+  if(!(Test-Path $FilePath -PathType Leaf)){
+    Send-Text $Context 404 "File not found" "text/plain; charset=utf-8"
+    return
+  }
+  $bytes=[IO.File]::ReadAllBytes($FilePath)
+  $Context.Response.StatusCode=200
+  $Context.Response.ContentType="model/stl"
+  $Context.Response.ContentLength64=$bytes.Length
+  $Context.Response.AddHeader("Content-Disposition",'attachment; filename="'+$DownloadName+'"')
+  $Context.Response.OutputStream.Write($bytes,0,$bytes.Length)
+  $Context.Response.Close()
+}
 function Send-Text($Context,[int]$Status,[string]$Text,[string]$ContentType){
   Set-Cors $Context.Response $Context.Request.Headers["Origin"]
   $Context.Response.StatusCode=$Status
@@ -216,6 +230,63 @@ while($listener.IsListening){
     if($path -eq "/api/health" -and $method -eq "GET"){Send-Json $context 200 @{ok=$true;provider="Grok";mode="local";apiKeyRequired=$false};continue}
     if($path -eq "/api/grok/status" -and $method -eq "GET"){Send-Json $context 200 @{ok=$true;authenticated=(Test-Path $AuthFile)};continue}
     if($path -eq "/api/grok/login" -and $method -eq "POST"){$oldKey=$env:XAI_API_KEY;try{$env:XAI_API_KEY=$null;Start-Process -FilePath $GrokExe -ArgumentList "login"}finally{$env:XAI_API_KEY=$oldKey};Send-Json $context 200 @{ok=$true};continue}
+    if($path -like "/api/files/*.stl" -and $method -eq "GET"){
+      $encodedName=$path.Substring("/api/files/".Length)
+      $fileName=[uri]::UnescapeDataString($encodedName)
+      if($fileName -notmatch '^[A-Za-z0-9._-]+\.stl      $body=Read-JsonBody $context
+      $prompt=[string]$body.prompt
+      try{
+        $info=New-DesignFile $prompt
+        if(!$info){Send-Json $context 400 @{error="No STL file request was detected."};continue}
+        Send-Json $context 200 @{ok=$true;fileName=$info.fileName;url=$info.url;kind=$info.kind;dimensions=$info.dimensions;inverted=$info.inverted}
+      }catch{
+        Send-Json $context 500 @{error=$_.Exception.Message}
+      }
+      continue
+    }
+    if($path -eq "/api/grok/chat" -and $method -eq "POST"){
+      if(!(Test-Path $AuthFile)){Send-Json $context 401 @{error="Grok is not signed in yet. Press Connect and sign in in your browser."};continue}
+      $body=Read-JsonBody $context
+      $prompt=[string]$body.prompt
+      $printer=[string]$body.printer
+      $nozzle=[string]$body.nozzle
+      $material=[string]$body.material
+      $lines=@()
+      if($body.history){foreach($item in @($body.history|Select-Object -Last 16)){$role=[string]$item.role;$txt=[string]$item.text;if($txt){$lines+=($role.ToUpper()+": "+$txt)}}}
+      $contextText=if($lines.Count){$lines -join ([Environment]::NewLine+[Environment]::NewLine)}else{"(no previous messages)"}
+      $designPrompt=@"
+You are G3DAI, a professional 3D modeling and 3D printing design partner.
+Help the user create real, printable 3D models.
+Think in exact dimensions, clearances, tolerances, wall thicknesses, print orientation, supports, infill, material, and assembly.
+When useful, provide complete directly usable OpenSCAD or Blender Python code.
+Never claim to inspect project folders, install tools, or write files; G3DAI handles local file generation itself.`nNever claim an STL exists unless a real file or complete reproducible model data is actually provided.
+
+Printer: $printer
+Nozzle: $nozzle mm
+Material: $material
+
+Conversation:
+$contextText
+
+Current user request:
+$prompt
+"@
+      try{$answer=Run-Grok $designPrompt;Send-Json $context 200 @{ok=$true;output=$answer}}catch{Send-Json $context 500 @{error=$_.Exception.Message}}
+      continue
+    }
+    Send-Text $context 404 "Not found" "text/plain; charset=utf-8"
+  }catch{try{Send-Text $context 500 $_.Exception.Message "text/plain; charset=utf-8"}catch{}}
+  }
+$listener.Stop()
+$listener.Close()){
+        Send-Text $context 400 "Invalid file name" "text/plain; charset=utf-8"
+        continue
+      }
+      $fileRoot=Join-Path (Join-Path $HOME "Downloads") "G3DAI"
+      $filePath=Join-Path $fileRoot $fileName
+      Send-File $context $filePath $fileName
+      continue
+    }
     if($path -eq "/api/model/generate" -and $method -eq "POST"){
       $body=Read-JsonBody $context
       $prompt=[string]$body.prompt
