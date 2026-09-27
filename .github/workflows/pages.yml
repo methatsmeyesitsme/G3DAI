@@ -25,7 +25,7 @@ jobs:
       - name: Build static site
         run: |
           mkdir -p dist
-          base64 -d site.gz.b64 | gzip -d > dist/index.html
+          cp index.html dist/index.html
           touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
