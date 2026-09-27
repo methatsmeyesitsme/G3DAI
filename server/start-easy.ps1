@@ -1,5 +1,26 @@
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $PSScriptRoot
+$ScriptDir = $PSScriptRoot
+$Root = Split-Path -Parent $ScriptDir
+
+# Find the real G3DAI index.html even when Windows extracted the ZIP into a nested folder.
+$IndexPath = $null
+$probe = $ScriptDir
+for ($i = 0; $i -lt 6 -and !$IndexPath; $i++) {
+  $candidate = Join-Path $probe "index.html"
+  if (Test-Path $candidate -PathType Leaf) {
+    $IndexPath = (Resolve-Path $candidate).Path
+    break
+  }
+  $candidate = Join-Path $probe "..\index.html"
+  if (Test-Path $candidate -PathType Leaf) {
+    $IndexPath = (Resolve-Path $candidate).Path
+    break
+  }
+  $probe = Split-Path -Parent $probe
+}
+if (!$IndexPath) {
+  throw "G3DAI index.html could not be found. Keep Start-G3DAI.bat, the server folder, and index.html inside the same extracted G3DAI folder."
+}
 $Port = 8787
 $HostAddress = "127.0.0.1"
 $GrokHome = if ($env:GROK_HOME) { $env:GROK_HOME } else { Join-Path $HOME ".grok" }
