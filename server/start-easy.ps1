@@ -1,3 +1,4 @@
+param([switch]$Setup,[switch]$NoBrowser)
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 $Root = Split-Path -Parent $ScriptDir
@@ -38,6 +39,43 @@ function Ensure-Grok {
 Ensure-Grok
 $env:PATH="$GrokBin;$env:PATH"
 $env:GROK_HOME=$GrokHome
+
+function Is-G3DAIRunning {
+  try {
+    $r=Invoke-WebRequest -Uri ("http://"+$HostAddress+":"+ $Port +"/api/health") -UseBasicParsing -TimeoutSec 1
+    return ($r.StatusCode -eq 200)
+  } catch {
+    return $false
+  }
+}
+
+if($Setup){
+  $taskName="G3DAI Local Server"
+  try {
+    $psExe=(Get-Command powershell.exe).Source
+    $taskArgs='-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $PSCommandPath + '" -NoBrowser'
+    $action=New-ScheduledTaskAction -Execute $psExe -Argument $taskArgs
+    $trigger=New-ScheduledTaskTrigger -AtLogOn
+    $principal=New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType InteractiveToken -RunLevel Limited
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
+  } catch {
+    throw "G3DAI could not install its automatic Windows startup task: $($_.Exception.Message)"
+  }
+
+  if(!(Is-G3DAIRunning)){
+    Start-Process -FilePath powershell.exe -WindowStyle Hidden -ArgumentList $taskArgs
+    Start-Sleep -Seconds 2
+  }
+
+  if(-not $NoBrowser){Start-Process ("http://"+$HostAddress+":"+ $Port +"/")}
+  Write-Host ""
+  Write-Host "G3DAI is installed and running in the background." -ForegroundColor Green
+  Write-Host "You can close this window. G3DAI will keep running." -ForegroundColor Cyan
+  Write-Host "It will start automatically when you sign into Windows." -ForegroundColor Cyan
+  Write-Host ""
+  exit 0
+}
+
 function Set-Cors([System.Net.HttpListenerResponse]$Response,[string]$Origin){
   if($Origin -eq "https://methatsmeyesitsme.github.io" -or $Origin -like "http://127.0.0.1:*" -or $Origin -like "http://localhost:*"){
     $Response.Headers["Access-Control-Allow-Origin"]=$Origin
@@ -80,7 +118,7 @@ Start-Process ("http://"+$HostAddress+":"+ $Port +"/")
 Write-Host ""
 Write-Host ("G3DAI is running at http://"+$HostAddress+":"+ $Port +"/") -ForegroundColor Green
 Write-Host "No xAI API key is used." -ForegroundColor DarkGray
-Write-Host "Close this window to stop G3DAI." -ForegroundColor Yellow
+if($NoBrowser){Write-Host "G3DAI background server is running." -ForegroundColor Green}else{Write-Host "Close this window to stop G3DAI." -ForegroundColor Yellow}
 Write-Host ""
 while($listener.IsListening){
   try{
@@ -88,7 +126,7 @@ while($listener.IsListening){
     $path=$context.Request.Url.AbsolutePath
     $method=$context.Request.HttpMethod
     if($method -eq "OPTIONS"){Set-Cors $context.Response $context.Request.Headers["Origin"];$context.Response.StatusCode=204;$context.Response.Close();continue}
-    if($path -eq "/" -or $path -eq "/index.html"){$html=Get-Content (Join-Path $Root "..\index.html") -Raw;Send-Text $context 200 $html "text/html; charset=utf-8";continue}
+    if($path -eq "/" -or $path -eq "/index.html"){$html=Get-Content $IndexPath -Raw;Send-Text $context 200 $html "text/html; charset=utf-8";continue}
     if($path -eq "/api/health" -and $method -eq "GET"){Send-Json $context 200 @{ok=$true;provider="Grok";mode="local";apiKeyRequired=$false};continue}
     if($path -eq "/api/grok/status" -and $method -eq "GET"){Send-Json $context 200 @{ok=$true;authenticated=(Test-Path $AuthFile)};continue}
     if($path -eq "/api/grok/login" -and $method -eq "POST"){$previousKey=$env:XAI_API_KEY;try{$env:XAI_API_KEY=$null;Start-Process -FilePath $GrokExe -ArgumentList "login"}finally{$env:XAI_API_KEY=$previousKey};Send-Json $context 200 @{ok=$true};continue}
