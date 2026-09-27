@@ -24,9 +24,11 @@ Run `start-local.bat`.
 
 The script checks for Node/npm, installs the official Grok CLI when necessary, and starts the bridge on port 8787.
 
-Then open G3DAI:
+Then open the local G3DAI window that the launcher opens automatically:
 
-https://methatsmeyesitsme.github.io/G3DAI/
+http://127.0.0.1:8787/
+
+The GitHub Pages site is still available at https://methatsmeyesitsme.github.io/G3DAI/, but the local address is the one to use when you want Grok through the local bridge.
 
 Open **Settings → Connect Grok** and complete the official Grok sign-in.
 
