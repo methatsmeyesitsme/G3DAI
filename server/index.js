@@ -9,7 +9,6 @@ const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "0.0.0.0";
 const GROK_HOME = process.env.GROK_HOME || join(homedir(), ".grok");
 const MAX_BODY = 2 * 1024 * 1024;
-const sessions = new Map();
 
 mkdirSync(GROK_HOME, { recursive: true });
 
@@ -154,8 +153,7 @@ async function chat(res, body) {
     return send(res, 401, { error: "Grok is not connected. Connect your Grok account first." });
   }
 
-  const sessionId = sessions.get(chatId) || randomUUID();
-  sessions.set(chatId, sessionId);
+  const sessionId = /^[0-9a-f-]{36}$/i.test(chatId) ? chatId : randomUUID();
 
   const designPrompt = [
     "You are G3DAI, a professional 3D model designer and 3D-printing engineering assistant.",
@@ -213,7 +211,6 @@ async function route(req, res) {
   if (req.url === "/api/grok/logout" && req.method === "POST") {
     try {
       await run("grok", ["logout"], { timeout: 30_000 });
-      sessions.clear();
       return send(res, 200, { authenticated: false });
     } catch (error) {
       return send(res, 500, { error: error.message || "Grok logout failed." });
