@@ -102,18 +102,45 @@ async function isAuthenticated() {
   }
 }
 
-async function login(res) {
-  try {
-    const result = await run("grok", ["login", "--device-auth"], { timeout: 5 * 60 * 1000 });
-    send(res, 200, { authenticated: true, ...extractDeviceInfo(result.stdout + "\n" + result.stderr) });
-  } catch (error) {
-    const info = extractDeviceInfo(error.message || "");
-    send(res, 500, {
-      authenticated: false,
-      error: error.message || "Grok login failed.",
-      ...info
+let loginProcess = null;
+let loginBuffer = "";
+
+function startDeviceLogin(res) {
+  if (loginProcess) {
+    return send(res, 409, {
+      error: "A Grok login is already in progress.",
+      ...extractDeviceInfo(loginBuffer)
     });
   }
+
+  loginBuffer = "";
+  loginProcess = spawn("grok", ["login", "--device-auth"], {
+    env: { ...process.env, GROK_HOME },
+    windowsHide: true
+  });
+
+  const onOutput = chunk => {
+    loginBuffer += chunk.toString();
+  };
+  loginProcess.stdout.on("data", onOutput);
+  loginProcess.stderr.on("data", onOutput);
+
+  loginProcess.on("error", error => {
+    loginBuffer += "\n" + (error.message || "");
+  });
+
+  loginProcess.on("close", () => {
+    loginProcess = null;
+  });
+
+  setTimeout(() => {
+    const info = extractDeviceInfo(loginBuffer);
+    send(res, 200, {
+      authenticated: false,
+      loginStarted: true,
+      ...info
+    });
+  }, 1200);
 }
 
 async function chat(res, body) {
@@ -180,7 +207,7 @@ async function route(req, res) {
   }
 
   if (req.url === "/api/grok/login" && req.method === "POST") {
-    return login(res);
+    return startDeviceLogin(res);
   }
 
   if (req.url === "/api/grok/logout" && req.method === "POST") {
