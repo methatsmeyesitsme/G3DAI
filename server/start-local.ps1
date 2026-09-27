@@ -26,6 +26,8 @@ Write-Host "Address: http://127.0.0.1:8787"
 Write-Host "Grok data: $env:GROK_HOME"
 Write-Host ""
 Write-Host "Leave this window running while using G3DAI."
+Write-Host "Opening local G3DAI in your browser..."
+Start-Process "http://127.0.0.1:8787/"
 Write-Host ""
 
 node (Join-Path $PSScriptRoot "index.js")
