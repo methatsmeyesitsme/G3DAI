@@ -97,6 +97,103 @@ function Read-JsonBody($Context){
   if(!$raw){return $null}
   return $raw|ConvertFrom-Json
 }
+function Test-DesignFileRequest([string]$Prompt){
+  if(!$Prompt){return $false}
+  $q=$Prompt.ToLower()
+  return (($q -match '\bstl\b') -or ($q -match '\.stl\b')) -and (($q -match '\b(make|create|generate|build|export|file|download|design)\b'))
+}
+function Get-PositiveNumber([string]$Prompt,[string]$Pattern,[double]$Default){
+  $m=[regex]::Match($Prompt,$Pattern,[Text.RegularExpressions.RegexOptions]::IgnoreCase)
+  if($m.Success){
+    $v=0.0
+    if([double]::TryParse($m.Groups[1].Value,[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$v) -and $v -gt 0){return $v}
+  }
+  return $Default
+}
+function Get-DesignFileName([string]$Prompt){
+  $q=$Prompt.ToLower()
+  if($q -match 'cone'){return 'cone'}
+  return 'printable-part'
+}
+function New-ConeStl([double]$Radius,[double]$Height,[bool]$Inverted,[int]$Segments=96){
+  $lines=New-Object System.Collections.Generic.List[string]
+  $label=if($Inverted){'inverted_cone'}else{'cone'}
+  [void]$lines.Add("solid $label")
+  $apex=if($Inverted){@(0.0,0.0,0.0)}else{@(0.0,0.0,$Height)}
+  $baseZ=if($Inverted){$Height}else{0.0}
+  $center=@(0.0,0.0,$baseZ)
+  for($i=0;$i -lt $Segments;$i++){
+    $a1=2.0*[Math]::PI*$i/$Segments
+    $a2=2.0*[Math]::PI*($i+1)/$Segments
+    $p1=@($Radius*[Math]::Cos($a1),$Radius*[Math]::Sin($a1),$baseZ)
+    $p2=@($Radius*[Math]::Cos($a2),$Radius*[Math]::Sin($a2),$baseZ)
+    if($Inverted){
+      $triA=$apex;$triB=$p2;$triC=$p1
+      $baseA=$center;$baseB=$p1;$baseC=$p2
+    }else{
+      $triA=$p1;$triB=$apex;$triC=$p2
+      $baseA=$center;$baseB=$p2;$baseC=$p1
+    }
+    $u=@($triB[0]-$triA[0],$triB[1]-$triA[1],$triB[2]-$triA[2])
+    $v=@($triC[0]-$triA[0],$triC[1]-$triA[1],$triC[2]-$triA[2])
+    $nx=$u[1]*$v[2]-$u[2]*$v[1]
+    $ny=$u[2]*$v[0]-$u[0]*$v[2]
+    $nz=$u[0]*$v[1]-$u[1]*$v[0]
+    $len=[Math]::Sqrt($nx*$nx+$ny*$ny+$nz*$nz)
+    if($len -le 0){$len=1}
+    $nx/=$len;$ny/=$len;$nz/=$len
+    [void]$lines.Add((" facet normal {0:F7} {1:F7} {2:F7}" -f $nx,$ny,$nz))
+    [void]$lines.Add("  outer loop")
+    foreach($pt in @($triA,$triB,$triC)){[void]$lines.Add(("   vertex {0:F4} {1:F4} {2:F4}" -f $pt[0],$pt[1],$pt[2]))}
+    [void]$lines.Add("  endloop")
+    [void]$lines.Add(" endfacet")
+
+    $u=@($baseB[0]-$baseA[0],$baseB[1]-$baseA[1],$baseB[2]-$baseA[2])
+    $v=@($baseC[0]-$baseA[0],$baseC[1]-$baseA[1],$baseC[2]-$baseA[2])
+    $nx=$u[1]*$v[2]-$u[2]*$v[1]
+    $ny=$u[2]*$v[0]-$u[0]*$v[2]
+    $nz=$u[0]*$v[1]-$u[1]*$v[0]
+    $len=[Math]::Sqrt($nx*$nx+$ny*$ny+$nz*$nz)
+    if($len -le 0){$len=1}
+    $nx/=$len;$ny/=$len;$nz/=$len
+    [void]$lines.Add((" facet normal {0:F7} {1:F7} {2:F7}" -f $nx,$ny,$nz))
+    [void]$lines.Add("  outer loop")
+    foreach($pt in @($baseA,$baseB,$baseC)){[void]$lines.Add(("   vertex {0:F4} {1:F4} {2:F4}" -f $pt[0],$pt[1],$pt[2]))}
+    [void]$lines.Add("  endloop")
+    [void]$lines.Add(" endfacet")
+  }
+  [void]$lines.Add("endsolid $label")
+  return ($lines -join [Environment]::NewLine)
+}
+function New-DesignFile([string]$Prompt){
+  if(!(Test-DesignFileRequest $Prompt)){return $null}
+  $downloadRoot=Join-Path $HOME "Downloads"
+  $outputDir=Join-Path $downloadRoot "G3DAI"
+  New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+  $kind=Get-DesignFileName $Prompt
+  $stamp=Get-Date -Format "yyyyMMdd-HHmmss-fff"
+  $safeName="$kind-$stamp.stl"
+  $filePath=Join-Path $outputDir $safeName
+  if($kind -eq 'cone'){
+    $diameter=Get-PositiveNumber $Prompt '(?:diameter|dia)\s*(?:is|of|=)?\s*(\d+(?:\.\d+)?)\s*mm' 40
+    $radius=Get-PositiveNumber $Prompt '(?:radius)\s*(?:is|of|=)?\s*(\d+(?:\.\d+)?)\s*mm' ($diameter/2)
+    $height=Get-PositiveNumber $Prompt '(?:height|tall)\s*(?:is|of|=)?\s*(\d+(?:\.\d+)?)\s*mm' 50
+    $inverted=($Prompt -match '(?i)inverted|upside[- ]?down|upside cone|apex down|point down')
+    $stl=New-ConeStl -Radius $radius -Height $height -Inverted $inverted
+  }else{
+    throw "This version can generate STL files for cone requests directly. Other shapes still need the model generator."
+  }
+  [IO.File]::WriteAllText($filePath,$stl,(New-Object Text.UTF8Encoding($false)))
+  $publicName=[uri]::EscapeDataString($safeName)
+  return [pscustomobject]@{
+    kind=$kind
+    fileName=$safeName
+    path=$filePath
+    url="/api/files/$publicName"
+    dimensions=if($kind -eq 'cone'){"{0} mm diameter x {1} mm height" -f ($radius*2),$height}else{$null}
+    inverted=$inverted
+  }
+}
 function Run-Grok([string]$DesignPrompt){
   $oldKey=$env:XAI_API_KEY
   try{$env:XAI_API_KEY=$null;$output=(& $GrokExe -p $DesignPrompt 2>&1|Out-String);$exitCode=$LASTEXITCODE}finally{$env:XAI_API_KEY=$oldKey}
@@ -119,6 +216,18 @@ while($listener.IsListening){
     if($path -eq "/api/health" -and $method -eq "GET"){Send-Json $context 200 @{ok=$true;provider="Grok";mode="local";apiKeyRequired=$false};continue}
     if($path -eq "/api/grok/status" -and $method -eq "GET"){Send-Json $context 200 @{ok=$true;authenticated=(Test-Path $AuthFile)};continue}
     if($path -eq "/api/grok/login" -and $method -eq "POST"){$oldKey=$env:XAI_API_KEY;try{$env:XAI_API_KEY=$null;Start-Process -FilePath $GrokExe -ArgumentList "login"}finally{$env:XAI_API_KEY=$oldKey};Send-Json $context 200 @{ok=$true};continue}
+    if($path -eq "/api/model/generate" -and $method -eq "POST"){
+      $body=Read-JsonBody $context
+      $prompt=[string]$body.prompt
+      try{
+        $info=New-DesignFile $prompt
+        if(!$info){Send-Json $context 400 @{error="No STL file request was detected."};continue}
+        Send-Json $context 200 @{ok=$true;fileName=$info.fileName;url=$info.url;kind=$info.kind;dimensions=$info.dimensions;inverted=$info.inverted}
+      }catch{
+        Send-Json $context 500 @{error=$_.Exception.Message}
+      }
+      continue
+    }
     if($path -eq "/api/grok/chat" -and $method -eq "POST"){
       if(!(Test-Path $AuthFile)){Send-Json $context 401 @{error="Grok is not signed in yet. Press Connect and sign in in your browser."};continue}
       $body=Read-JsonBody $context
