@@ -152,6 +152,5 @@ $prompt
     Send-Text $context 404 "Not found" "text/plain; charset=utf-8"
   }catch{try{Send-Text $context 500 $_.Exception.Message "text/plain; charset=utf-8"}catch{}}
   }
-}
 $listener.Stop()
 $listener.Close()
