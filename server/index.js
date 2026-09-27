@@ -1,6 +1,6 @@
 import http from "node:http";
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -202,12 +202,26 @@ async function chat(res, body, origin) {
   }
 }
 
+function serveLocalSite(res) {
+  try {
+    const html = readFileSync(join(process.cwd(), "..", "index.html"), "utf8");
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(html);
+  } catch (error) {
+    send(res, 500, { error: "Could not load G3DAI frontend: " + error.message });
+  }
+}
+
 async function route(req, res) {
   const origin = req.headers.origin || "";
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, corsHeaders(origin));
     return res.end();
+  }
+
+  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
+    return serveLocalSite(res);
   }
 
   if (req.url === "/api/health" && req.method === "GET") {
