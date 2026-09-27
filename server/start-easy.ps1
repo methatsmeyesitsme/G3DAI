@@ -199,12 +199,16 @@ function New-DesignFile([string]$Prompt){
   }
   [IO.File]::WriteAllText($filePath,$stl,(New-Object Text.UTF8Encoding($false)))
   $publicName=[uri]::EscapeDataString($safeName)
+  $dimensions=$null
+  if($kind -eq 'cone'){
+    $dimensions="{0} mm diameter x {1} mm height" -f ($radius*2),$height
+  }
   return [pscustomobject]@{
     kind=$kind
     fileName=$safeName
     path=$filePath
     url="/api/files/$publicName"
-    dimensions=if($kind -eq 'cone'){"{0} mm diameter x {1} mm height" -f ($radius*2),$height}else{$null}
+    dimensions=$dimensions
     inverted=$inverted
   }
 }
@@ -233,15 +237,13 @@ while($listener.IsListening){
     if($path -like "/api/files/*.stl" -and $method -eq "GET"){
       $encodedName=$path.Substring("/api/files/".Length)
       $fileName=[uri]::UnescapeDataString($encodedName)
-      if($fileName -notmatch '^[A-Za-z0-9._-]+\.stl      $body=Read-JsonBody $context
-      $prompt=[string]$body.prompt
-      try{
-        $info=New-DesignFile $prompt
-        if(!$info){Send-Json $context 400 @{error="No STL file request was detected."};continue}
-        Send-Json $context 200 @{ok=$true;fileName=$info.fileName;url=$info.url;kind=$info.kind;dimensions=$info.dimensions;inverted=$info.inverted}
-      }catch{
-        Send-Json $context 500 @{error=$_.Exception.Message}
+      if($fileName -notmatch '^[A-Za-z0-9._-]+\.stl$'){
+        Send-Text $context 400 "Invalid file name" "text/plain; charset=utf-8"
+        continue
       }
+      $fileRoot=Join-Path (Join-Path $HOME "Downloads") "G3DAI"
+      $filePath=Join-Path $fileRoot $fileName
+      Send-File $context $filePath $fileName
       continue
     }
     if($path -eq "/api/grok/chat" -and $method -eq "POST"){
