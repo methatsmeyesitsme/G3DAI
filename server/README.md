@@ -1,8 +1,42 @@
-# G3DAI Grok bridge
+# G3DAI local Grok bridge
 
-The G3DAI backend uses xAI's official Grok CLI instead of the xAI REST API.
+G3DAI now uses a **local** backend instead of Render for Grok.
 
-Authentication is performed with the official Grok CLI's supported OAuth/device-code flow. The authenticated Grok session is then reused by headless Grok commands for inference.
+Your computer runs the official xAI Grok CLI, your Grok login is stored in the CLI's local `.grok` directory, and the G3DAI GitHub Pages frontend talks to that local bridge.
+
+No xAI API key is required.
+
+## How it works
+
+G3DAI GitHub Pages
+→ http://127.0.0.1:8787
+→ G3DAI local bridge
+→ official Grok CLI
+→ your signed-in Grok account
+
+The local bridge listens on **127.0.0.1 only**, so it is not exposed to your LAN or the public internet.
+
+xAI documents four Grok Build authentication methods, including Browser OIDC and device-code authentication. The CLI stores user settings under `~/.grok`, and headless sessions under `~/.grok/sessions`. citeturn863322search1turn379989search3turn379989search4
+
+## Windows setup
+
+Run `start-local.bat`.
+
+The script checks for Node/npm, installs the official Grok CLI when necessary, and starts the bridge on port 8787.
+
+Then open G3DAI:
+
+https://methatsmeyesitsme.github.io/G3DAI/
+
+Open **Settings → Connect Grok** and complete the official Grok sign-in.
+
+After you have authenticated once, the CLI keeps its authentication state locally in your user `.grok` directory. Headless Grok sessions are also stored locally. citeturn379989search3turn379989search4
+
+## Running it
+
+Keep the local bridge window open while G3DAI is using Grok.
+
+Stop it by closing that window.
 
 ## Endpoints
 
@@ -12,34 +46,13 @@ Authentication is performed with the official Grok CLI's supported OAuth/device-
 - POST /api/grok/logout
 - POST /api/grok/chat
 
-## Authentication
+## Security
 
-No xAI API key is required.
+- No `XAI_API_KEY`
+- No Grok password collected by G3DAI
+- No browser cookie scraping
+- Grok credentials remain under the local Grok CLI directory
+- Server binds to 127.0.0.1 only
+- CORS allows the G3DAI GitHub Pages origin plus local origins
 
-The login endpoint starts:
-
-    grok login --device-auth
-
-The server returns the device URL/code, and the G3DAI frontend guides the user through the official xAI sign-in. Authentication state is checked by the real Grok CLI, so G3DAI never claims a connection that does not exist.
-
-## Inference
-
-Chat requests use an authenticated Grok headless session with Grok 4.7:
-
-    grok -m grok-4.7 -s <session-id> -p <prompt>
-
-The Grok credential stays on the backend. G3DAI never asks for or stores a Grok password, browser cookie, or xAI API key.
-
-## Hosting
-
-GitHub Pages can host the frontend, but it cannot execute this Node server. Deploy this bridge separately on a Node-capable host.
-
-For hosted use, the directory pointed to by GROK_HOME must be persistent so the OAuth session survives restarts.
-
-For a public deployment, protect the bridge with an application-level pairing/authentication layer. Do not expose an authenticated single-owner Grok session as an unrestricted public endpoint.
-
-## Official xAI documentation
-
-https://docs.x.ai/build/cli/reference
-https://docs.x.ai/build/cli/headless-scripting
-https://docs.x.ai/build/enterprise
+This architecture is intentionally single-user/local. The bridge should not be exposed through a public tunnel or proxy unless an additional authentication layer is added.
