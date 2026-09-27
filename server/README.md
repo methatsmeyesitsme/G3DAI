@@ -16,7 +16,7 @@ G3DAI GitHub Pages
 
 The local bridge listens on **127.0.0.1 only**, so it is not exposed to your LAN or the public internet.
 
-xAI documents four Grok Build authentication methods, including Browser OIDC and device-code authentication. The CLI stores user settings under `~/.grok`, and headless sessions under `~/.grok/sessions`. citeturn863322search1turn379989search3turn379989search4
+xAI documents four Grok Build authentication methods, including Browser OIDC and device-code authentication. The CLI stores user settings under `~/.grok`, and headless sessions under `~/.grok/sessions`.
 
 ## Windows setup
 
