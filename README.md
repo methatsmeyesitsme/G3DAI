@@ -30,3 +30,14 @@ The current browser-side geometry engine contains real parametric generators for
 ## Deployment
 
 GitHub Actions deploys `index.html` directly to GitHub Pages on pushes to `main`.
+
+
+## Full-stack backend foundation
+
+The repository now also contains a Node 20 backend under `server/`. It provides durable server-side state for chats and jobs, job cancellation, health checks, and an isolated Grok-provider adapter. The frontend can remain on GitHub Pages while the backend is deployed separately.
+
+The provider adapter intentionally fails closed. No personal Grok password, browser cookie, scraped session, or API key is collected by G3DAI. A real xAI-supported third-party authentication/inference bridge can be connected to the adapter when xAI documents one.
+
+## Current honest status
+
+The application and backend foundations are real. The remaining external dependency is the provider authorization mechanism: xAI's current public documentation does not expose a consumer-grok.com OAuth flow that lets an arbitrary third-party website consume the user's Grok subscription for inference. xAI documents shared xAI/Grok accounts but separate API billing, and its non-key interactive authentication documentation is for Grok Build/CLI rather than a generic third-party web-app inference API.
