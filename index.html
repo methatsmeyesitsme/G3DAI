@@ -4,7 +4,7 @@
 <style>
 :root{--bg:#07101d;--p:#0d1726;--p2:#111e30;--line:#203049;--t:#edf4ff;--m:#91a3ba;--a:#6f8cff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:14px system-ui,sans-serif;height:100vh;overflow:hidden}button,input,textarea,select{font:inherit;color:inherit}button{border:0;cursor:pointer}.app{position:relative;width:100%;height:100vh;overflow:hidden}.main{width:100%;height:100%;display:flex;flex-direction:column}.side,.model{position:absolute;top:0;bottom:0;background:var(--p);display:flex;flex-direction:column;z-index:1000;transition:transform .22s ease,opacity .18s ease;box-shadow:0 0 24px #0004}.side{left:0;width:235px;border-right:1px solid var(--line);padding-top:62px}.model{right:0;width:380px;border-left:1px solid var(--line)}.app.left-closed .side{transform:translateX(-100%);opacity:0;pointer-events:none}.app.right-closed .model{transform:translateX(100%);opacity:0;pointer-events:none}.top{height:62px;min-height:62px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px;position:relative;z-index:1100}.menu-toggle{position:relative;z-index:1101;touch-action:manipulation;pointer-events:auto}.header-brand{font-size:20px;font-weight:800;white-space:nowrap;line-height:1}.header-brand span{color:var(--a)}.messages{position:relative;z-index:1;flex:1;overflow:auto;padding:28px max(22px,calc((100% - 850px)/2)) 240px;display:flex;flex-direction:column;gap:16px}.composer{position:relative;z-index:1;padding:14px max(22px,calc((100% - 850px)/2));border-top:1px solid var(--line)}.side{overflow:auto}.menu-backdrop{display:none;position:absolute;inset:0;background:#0006;z-index:900}.app.left-open .menu-backdrop{display:block}.brand{padding:20px;font-size:21px;font-weight:800}.version{margin-top:4px;color:#63758e;font-size:10px;font-weight:500;letter-spacing:.6px}.brand span{color:var(--a)}.nav,.history{padding:0 12px}.nav button,.chat{display:block;width:100%;padding:10px 12px;text-align:left;background:transparent;color:var(--m);border-radius:9px;margin:2px 0}.nav button:hover,.chat:hover,.chat.active{background:#17263b;color:#fff}.chatrow{display:grid;grid-template-columns:1fr 30px;gap:3px;align-items:center}.chatrow .chat{margin:2px 0}.deletechat{height:32px;width:30px;background:transparent;color:#71849d;border-radius:7px;font-size:14px}.deletechat:hover{background:#2a1d28;color:#ff8c9b}.label{padding:18px 12px 6px;color:#63758e;text-transform:uppercase;font-size:10px;letter-spacing:1px}.history{overflow:auto}.main{min-width:0;display:flex;flex-direction:column}.top{height:62px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px}.menu-toggle{width:40px;height:40px;border-radius:10px;background:var(--p2);border:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;flex:none}.menu-toggle span{width:19px;height:2px;border-radius:2px;background:var(--t);transition:transform .2s ease,opacity .2s ease}.top-left{display:flex;align-items:center;gap:16px;min-width:0}.title-stack{margin-left:150px}.top-left #title{color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}body.light .top-left #title{color:#152033}.title-stack{min-width:0;display:flex;flex-direction:column;gap:2px}.title-version{color:#63758e;font-size:10px;font-weight:500;letter-spacing:.5px}.top-right{display:flex;align-items:center;gap:12px}.new-chat-toggle{font-size:20px;font-weight:500;line-height:1}.right-menu-toggle{flex:none}.status{color:var(--m);font-size:12px}.messages{flex:1;overflow:auto;padding:28px max(22px,calc((100% - 850px)/2)) 240px;display:flex;flex-direction:column;gap:16px;scroll-behavior:smooth}.msg{max-width:850px;white-space:pre-wrap;line-height:1.55}.user{align-self:flex-end;background:#16243a;border:1px solid #223653;border-radius:16px 16px 4px 16px;padding:12px 15px;max-width:720px}.assistant{padding:6px 2px}.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--m);padding:30px}.composer{padding:14px max(22px,calc((100% - 850px)/2));border-top:1px solid var(--line)}.compose{background:var(--p2);border:1px solid var(--line);border-radius:15px;padding:10px}.compose textarea{width:100%;background:transparent;border:0;outline:0;resize:none;min-height:48px}.tools{display:flex;justify-content:space-between;align-items:center;margin-top:7px}.pill,.icon{background:#17263b;border:1px solid #263a57;border-radius:9px;padding:8px 10px}.primary{background:var(--a);color:#06101d;font-weight:700}.icon{width:36px}.preview{height:300px;background:#07101a;border-bottom:1px solid var(--line)}.preview canvas{display:block;width:100%;height:100%}.modelhead{padding:16px;border-bottom:1px solid var(--line)}.modeltitle{font-weight:700}.modelbody{overflow:auto}.card{margin:12px;padding:12px;background:var(--p2);border:1px solid var(--line);border-radius:12px}.row{display:flex;justify-content:space-between;padding:7px 0;color:var(--m)}.row b{color:var(--t);font-weight:500}.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.actions button,.actions a{padding:9px;border-radius:8px;background:#17263b}.actions a{display:flex;align-items:center;justify-content:center;text-decoration:none;color:inherit}.actions .primary{background:var(--a)}.versions button{display:block;width:100%;text-align:left;background:transparent;padding:8px;border-radius:7px;color:var(--m)}.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:20px;z-index:5000}.modal.show{display:flex}.modalbox{position:relative;width:min(620px,100%);max-height:calc(100vh - 40px);overflow:auto;background:var(--p);border:1px solid var(--line);border-radius:15px;padding:18px}.modal-close{position:absolute;top:10px;right:10px;width:32px;height:32px;border:1px solid var(--line);border-radius:9px;background:var(--p2);color:var(--m);font-size:20px;line-height:1;display:grid;place-items:center}.modal-close:hover{color:var(--t);background:#17263b}.modalbox h2{padding-right:42px}.field{margin:12px 0}.field label{display:block;color:var(--m);font-size:12px;margin-bottom:6px}.field input,.field select{width:100%;background:var(--p2);border:1px solid var(--line);padding:10px;border-radius:8px}.notice{padding:12px;border-radius:10px;background:#182238;color:#aebddd;line-height:1.45}.connect{display:flex;align-items:center;justify-content:space-between;gap:12px}.dot{width:9px;height:9px;border-radius:50%;background:#6d7c91;display:inline-block;margin-right:7px}.connectbtn{background:var(--a);color:#06101d;font-weight:700;padding:9px 13px;border-radius:8px}.subtle{font-size:11px;color:#71849d;margin-top:7px}.thinking{display:flex;align-items:center;gap:7px;color:var(--m);padding:6px 2px;font-size:13px}.thinking .dots{display:inline-flex;gap:3px}.thinking .dotx{width:5px;height:5px;border-radius:50%;background:currentColor;animation:thinkPulse 1.15s infinite ease-in-out}.thinking .dotx:nth-child(2){animation-delay:.15s}.thinking .dotx:nth-child(3){animation-delay:.3s}@keyframes thinkPulse{0%,60%,100%{opacity:.28;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}.typewriter-caret{display:inline-block;width:7px;height:1.05em;vertical-align:-2px;border-radius:2px;background:currentColor;animation:caretBlink .8s steps(1) infinite}@keyframes caretBlink{50%{opacity:0}}body.light{--bg:#f5f7fb;--p:#ffffff;--p2:#eef2f8;--line:#d6deea;--t:#152033;--m:#5f6e83;--a:#5f78e8}body.light .side,body.light .model{background:#fff}body.light .top{background:#fff}body.light .nav button:hover,body.light .chat:hover,body.light .chat.active{background:#e8edf7;color:#152033}body.light .user{background:#e9eef8;border-color:#d2dbea}body.light .compose,body.light .card,body.light .field input,body.light .field select{background:#f0f3f8;border-color:#d6deea}body.light .pill,body.light .icon,body.light .actions button{background:#e7ecf5;border-color:#d0d9e8}body.light .primary{color:#fff;background:#6079e8}body.light .modalbox{background:#fff}body.light .notice{background:#eef2f8;color:#5b6a80}body.light .preview{background:#eef2f7}@media(max-width:1050px){.side{width:210px}.model{display:none}}@media(max-width:650px){.side{width:min(280px,82vw);z-index:1000}.model{display:none}.messages,.composer{padding-left:14px;padding-right:14px}.top{padding-left:10px;padding-right:10px}.top-left{gap:8px}.title-stack{max-width:calc(100vw - 100px)}}</style></head><body>
 <div class="app"><aside class="side"><div class="nav"><button id="new" type="button" onclick="window.__g3daiNewChatStandalone(event)">＋ New Chat</button><button id="search" type="button">⌕ Search</button><button id="projects" type="button">▦ Projects</button><button id="settings" type="button">⚙ Settings</button></div><div class="label">Chats</div><div class="history" id="history"></div></aside>
-<main class="main"><header class="top"><div class="top-left"><button class="menu-toggle" id="menuToggle" aria-label="Open or close left menu" aria-expanded="true" title="Close left menu" type="button" onclick="window.__g3daiToggleMenu(event)"><span></span><span></span><span></span></button><div class="header-brand">G3D<span>AI</span></div><div class="title-stack"><span id="title">New Chat</span><span class="title-version">v1.0.71</span></div></div><div class="top-right"><span class="status" id="status">Grok: start G3DAI</span><button class="menu-toggle new-chat-toggle" id="newChatTop" aria-label="New chat" title="New chat" type="button" onclick="window.__g3daiNewChatStandalone(event)">✎</button><button class="menu-toggle right-menu-toggle" id="rightMenuToggle" aria-label="Open or close right menu" aria-expanded="true" title="Close right menu" type="button" onclick="window.__g3daiToggleRightMenu(event)"><span></span><span></span><span></span></button></div></header><section class="messages" id="messages"></section><footer class="composer"><div class="compose"><textarea id="prompt" placeholder="Describe the 3D model you want..." onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();window.__g3daiHandleSend(event);}"></textarea><div class="tools"><div><button class="pill" id="attach">＋ Files</button><input id="files" type="file" multiple hidden accept=".stl,.obj,.step,.stp,.3mf,.pdf,.txt,.png,.jpg,.jpeg,.webp"><span class="status" id="fileNames"></span></div><div><button class="icon primary" id="send" aria-label="Send" type="button" onclick="window.__g3daiHandleSend(event)">↑</button></div></div></div></footer></main>
+<main class="main"><header class="top"><div class="top-left"><button class="menu-toggle" id="menuToggle" aria-label="Open or close left menu" aria-expanded="true" title="Close left menu" type="button" onclick="window.__g3daiToggleMenu(event)"><span></span><span></span><span></span></button><div class="header-brand">G3D<span>AI</span></div><div class="title-stack"><span id="title">New Chat</span><span class="title-version">v1.0.72</span></div></div><div class="top-right"><span class="status" id="status">Grok: start G3DAI</span><button class="menu-toggle new-chat-toggle" id="newChatTop" aria-label="New chat" title="New chat" type="button" onclick="window.__g3daiNewChatStandalone(event)">✎</button><button class="menu-toggle right-menu-toggle" id="rightMenuToggle" aria-label="Open or close right menu" aria-expanded="true" title="Close right menu" type="button" onclick="window.__g3daiToggleRightMenu(event)"><span></span><span></span><span></span></button></div></header><section class="messages" id="messages"></section><footer class="composer"><div class="compose"><textarea id="prompt" placeholder="Describe the 3D model you want..." onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();window.__g3daiHandleSend(event);}"></textarea><div class="tools"><div><button class="pill" id="attach">＋ Files</button><input id="files" type="file" multiple hidden accept=".stl,.obj,.step,.stp,.3mf,.pdf,.txt,.png,.jpg,.jpeg,.webp"><span class="status" id="fileNames"></span></div><div><button class="icon primary" id="send" aria-label="Send" type="button" onclick="window.__g3daiHandleSend(event)">↑</button></div></div></div></footer></main>
 <aside class="model"><div class="modelhead"><div class="modeltitle" id="modelTitle">No model yet</div><div class="status" id="modelMeta">Real 3D preview</div></div><div class="preview" id="preview"></div><div class="modelbody" id="modelBody"></div></aside></div>
 <div class="modal" id="modal"><div class="modalbox" id="modalbox"></div></div><div id="menuBackdrop" class="menu-backdrop" aria-hidden="true"></div>
 <script>
@@ -259,12 +259,47 @@
     return {
       url:url,
       fileUrl:url,
+      stlData:lines.join('\n'),
       fileName:(inverted?'inverted-cone':'cone')+'-'+Date.now()+'.stl',
       kind:'cone',
       dimensions:(radius*2).toFixed(1)+' mm diameter x '+height.toFixed(1)+' mm height',
       inverted:inverted
     };
   };
+  window.__g3daiFallbackConePreview=function(info){
+    try{
+      var box=document.getElementById('preview');
+      if(!box)return;
+      box.innerHTML='';
+      var canvas=document.createElement('canvas');
+      canvas.width=Math.max(520,(box.clientWidth||520)*2);
+      canvas.height=Math.max(420,(box.clientHeight||300)*2);
+      canvas.style.width='100%';canvas.style.height='100%';canvas.style.display='block';
+      box.appendChild(canvas);
+      var ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height,t=0;
+      var dim=String(info&&info.dimensions||'40 mm diameter x 50 mm height');
+      var dm=dim.match(/([0-9.]+) mm diameter/),hm=dim.match(/x ([0-9.]+) mm height/);
+      var radius=Math.max(1,Number(dm?dm[1]:40)/2),height=Math.max(1,Number(hm?hm[1]:50));
+      function frame(){
+        if(!document.body.contains(canvas))return;
+        ctx.clearRect(0,0,w,h);ctx.fillStyle='#07101a';ctx.fillRect(0,0,w,h);
+        var cx=w*.5,cy=h*.57,scale=Math.min(w/(radius*3.3),h/(height*2.0)),ang=t*.6,cs=Math.cos(ang),sn=Math.sin(ang);
+        function P(x,y,z){var rx=x*cs-y*sn,ry=x*sn+y*cs;return [cx+rx*scale,cy+(-z*.95+ry*.38)*scale];}
+        var steps=48,base=[],ap=P(0,0,height);
+        for(var i=0;i<steps;i++){var a=2*Math.PI*i/steps;base.push(P(radius*Math.cos(a),radius*Math.sin(a),0));}
+        ctx.beginPath();ctx.moveTo(ap[0],ap[1]);for(var j=0;j<steps;j++)ctx.lineTo(base[j][0],base[j][1]);ctx.closePath();ctx.fillStyle='rgba(111,140,255,.28)';ctx.fill();
+        ctx.beginPath();ctx.moveTo(base[0][0],base[0][1]);for(var k=1;k<steps;k++)ctx.lineTo(base[k][0],base[k][1]);ctx.closePath();ctx.fillStyle='rgba(111,140,255,.48)';ctx.fill();
+        ctx.strokeStyle='rgba(220,232,255,.9)';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(ap[0],ap[1]);ctx.lineTo(base[0][0],base[0][1]);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ap[0],ap[1]);ctx.lineTo(base[Math.floor(steps/2)][0],base[Math.floor(steps/2)][1]);ctx.stroke();
+        ctx.font='18px system-ui,sans-serif';ctx.fillStyle='rgba(237,244,255,.9)';ctx.fillText('Cone STL preview',24,34);
+        ctx.font='13px system-ui,sans-serif';ctx.fillStyle='rgba(145,163,186,.9)';ctx.fillText(dim,24,56);
+        t+=.018;requestAnimationFrame(frame);
+      }
+      frame();
+    }catch(e){}
+  };
+
   window.__g3daiHandleSend=async function(e){
     if(e){
       e.preventDefault();
@@ -307,6 +342,60 @@
       if(fileResp.ok&&fileData.url)generatedFile=fileData;
     }catch(err){}
     if(!generatedFile&&typeof window.__g3daiGenerateBrowserFile==='function')generatedFile=window.__g3daiGenerateBrowserFile(text);
+    if(generatedFile){
+      if(!Array.isArray(chat.models))chat.models=[];
+      var sourceUrl=String(generatedFile.fileUrl||generatedFile.url||'');
+      var sessionUrl=sourceUrl.indexOf('blob:')===0?sourceUrl:null;
+      var savedModel={
+        version:String(chat.models.length+1).padStart(2,'0'),
+        prompt:text,
+        name:generatedFile.kind==='cone'?(generatedFile.inverted?'Inverted Cone':'Cone'):'Printable Part',
+        type:generatedFile.kind||'model',
+        fileName:generatedFile.fileName,
+        fileUrl:generatedFile.stlData?null:sessionUrl,
+        stlData:generatedFile.stlData||null,
+        dimensions:generatedFile.dimensions||null,
+        inverted:!!generatedFile.inverted
+      };
+      chat.models.push(savedModel);
+      chat.updated=Date.now();
+      persistState(state);
+      var app=document.querySelector('.app');
+      if(app){app.classList.remove('right-closed');app.classList.add('left-closed');}
+      if(status)status.textContent='STL created';
+      var box=document.getElementById('messages');
+      if(box){
+        var note=document.createElement('div');
+        note.className='msg assistant';
+        var link=document.createElement('a');
+        link.className='pill primary';
+        link.href='#';
+        link.textContent='Download '+generatedFile.fileName;
+        link.onclick=function(ev){
+          ev.preventDefault();
+          var u=generatedFile.stlData?URL.createObjectURL(new Blob([generatedFile.stlData],{type:'model/stl'})):sessionUrl;
+          if(!u)return;
+          var a=document.createElement('a');
+          a.href=u;a.download=generatedFile.fileName;
+          document.body.appendChild(a);a.click();a.remove();
+          if(String(u).indexOf('blob:')===0)setTimeout(function(){URL.revokeObjectURL(u)},2000);
+        };
+        note.appendChild(link);
+        note.appendChild(document.createTextNode('  Created a real STL file.'));
+        box.appendChild(note);
+        box.scrollTo({top:box.scrollHeight,behavior:'smooth'});
+      }
+      var mt=document.getElementById('modelTitle'),mm=document.getElementById('modelMeta'),body=document.getElementById('modelBody');
+      if(mt)mt.textContent=savedModel.name+' · v'+savedModel.version;
+      if(mm)mm.textContent='cone · '+(state.settings.material||'PLA')+' · STL ready';
+      if(body)body.innerHTML='<div class="card"><div class="row"><span>Version</span><b>v'+savedModel.version+'</b></div><div class="row"><span>Printer</span><b>'+state.settings.printer+'</b></div><div class="row"><span>Nozzle</span><b>'+state.settings.nozzle+' mm</b></div><div class="row"><span>Material</span><b>'+state.settings.material+'</b></div>'+(savedModel.dimensions?'<div class="row"><span>Size</span><b>'+savedModel.dimensions+'</b></div>':'')+'<div class="actions"><a id="fallbackDownload" class="primary" href="#">Download STL</a></div></div>';
+      var fd=document.getElementById('fallbackDownload');
+      if(fd)fd.onclick=function(ev){ev.preventDefault();link.click();};
+      window.__g3daiFallbackConePreview(generatedFile);
+      renderSavedChats();
+      return;
+    }
+
     if(status)status.textContent='Grok: Thinking…';
     var box=document.getElementById('messages');
     if(box){
@@ -716,7 +805,9 @@ function addServerFileModel(c,p,info){
   let existing=c.models.find(x=>x.fileName===info.fileName);
   if(existing){S.ui=S.ui||{};S.ui.rightClosed=false;save();showModel(existing);return existing}
   let made=make(p);
-  let v={version:nextModelVersion(c),prompt:p,name:info.kind==='cone'?(info.inverted?'Inverted Cone':'Cone'):made.name,type:made.type,fileName:info.fileName,fileUrl:backendUrl()+info.url,dimensions:info.dimensions,inverted:!!info.inverted};
+  let sourceUrl=String(info.fileUrl||info.url||'');
+  let normalizedUrl=sourceUrl.indexOf('blob:')===0?sourceUrl:(sourceUrl?backendUrl()+sourceUrl:null);
+  let v={version:nextModelVersion(c),prompt:p,name:info.kind==='cone'?(info.inverted?'Inverted Cone':'Cone'):made.name,type:made.type,fileName:info.fileName,fileUrl:info.stlData?null:normalizedUrl,stlData:info.stlData||null,dimensions:info.dimensions,inverted:!!info.inverted};
   c.models.push(v);
   c.updated=Date.now();
   S.ui=S.ui||{};
@@ -754,7 +845,7 @@ function showModel(v){
   let download=v.fileUrl?'<a id="dl" class="primary" href="'+v.fileUrl+'">Download STL</a>':'<button id="dl">Download STL</button>';
   b.innerHTML='<div class="card"><div class="row"><span>Version</span><b>v'+v.version+'</b></div><div class="row"><span>Printer</span><b>'+S.settings.printer+'</b></div><div class="row"><span>Nozzle</span><b>'+S.settings.nozzle+' mm</b></div><div class="row"><span>Material</span><b>'+S.settings.material+'</b></div>'+(v.dimensions?'<div class="row"><span>Size</span><b>'+v.dimensions+'</b></div>':'')+'<div class="actions">'+download+'<button id="var" class="primary">Create variation</button></div><div class="label" style="padding-left:0">Versions</div><div id="vers" class="versions"></div></div>';
   show(make(v.prompt).g);
-  if(!v.fileUrl)$('dl').onclick=()=>{let x=make(v.prompt);show(x.g);dl(stl(x.g),v.name.replace(/\s+/g,'-').toLowerCase()+'-v'+v.version+'.stl')};
+  if(!v.fileUrl)$('dl').onclick=()=>{let x=make(v.prompt);show(x.g);let data=v.stlData||stl(x.g);dl(data,v.name.replace(/\s+/g,'-').toLowerCase()+'-v'+v.version+'.stl')};
   $('var').onclick=()=>{$('prompt').value='Modify '+v.name+': ';$('prompt').focus()};
   (chat().models||[]).forEach(x=>{let z=document.createElement('button');z.textContent='v'+x.version+' · '+x.name;z.onclick=()=>showModel(x);$('vers').appendChild(z)})
 }
@@ -789,7 +880,7 @@ async function send(){
       if(jobRef.cancel)return;
       thinking=false;
       add('assistant','Created the real STL file: '+generatedFile.fileName+'\nUse the Download STL button in the 3D model panel.');
-      nameChatWithGrok(c);
+      if(c.title==='New Chat'){c.title=(generatedFile.kind==='cone'?'Cone STL':'STL File');c.updated=Date.now();save();renderSavedChats();}
       return;
     }
     let history=c.messages.map(x=>({role:x.role,text:x.text}));
