@@ -122,7 +122,7 @@ function Test-StlRequest([string]$Prompt){
   return (($q -match '\bstl\b') -or ($q -match '\.stl\b'))
 }
 function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4,[string]$WorkingDir="",[switch]$PlannerMode){
-  $timeoutSeconds=if($PlannerMode){120}else{300}
+  $timeoutSeconds=if($PlannerMode){60}else{180}
   $run=$null
   $oldKey=$env:XAI_API_KEY
   try{
@@ -133,7 +133,7 @@ function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4,[string]$WorkingDir="",
       $env:GROK_HOME=$Home
       $args=@()
       if($Cwd){$args+=@("--cwd",$Cwd)}
-      $args+=@("-p",$Prompt,"-m","grok-4.5","--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--no-memory","--disable-web-search","--effort","low","--max-turns",$Turns,"--system-prompt-override",$(if($Planner){"You are a fast STL code generator. Return only the exact requested G3DAI build-script markers and Python code."}else{"You are a fast 3D design assistant. Answer directly and concisely."}))
+      $args+=@("-p",$Prompt,"-m",$(if($Planner){"grok-4.20-non-reasoning"}else{"grok-4.7"}),"--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--no-memory","--disable-web-search","--max-turns",$Turns,"--system-prompt-override",$(if($Planner){"You are a fast STL code generator. Return only the exact requested G3DAI build-script markers and Python code."}else{"You are a fast 3D design assistant. Answer directly and concisely."}))
       if($Planner){$args+=@("--disallowed-tools","Bash,Edit,Read,Grep,WebFetch,WebSearch,MCPTool")}else{$args+=@("--always-approve")}
       & $Exe @args 2>&1 | Out-String
     } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns,$WorkingDir,[bool]$PlannerMode
@@ -233,7 +233,7 @@ while($listener.IsListening){
       $stlPath=Join-Path $outputDir $stlName
       $stlInstructions=if($isStl){
         "Return only a real STL build script for G3DAI to execute locally. Do not execute tools and do not inspect the workspace. Do not browse the web, plan, or ask questions. Return exactly G3DAI_STL_SCRIPT_START followed by one Python 3 script and then G3DAI_STL_SCRIPT_END. The Python script must use only the standard library, generate the requested watertight mesh itself, and write the finished STL to this exact path: $stlPath. Do not create OpenSCAD, do not call shell commands, do not use subprocess, do not access the network, and do not use external packages. For a simple ball, directly generate the sphere triangle mesh and write a valid binary STL. The response must contain only the two markers and the Python script."
-      }      }else{
+      }else{
         "Answer the user normally. For design tasks, provide concrete dimensions and practical 3D-printing guidance. Do not claim to have created a file unless you actually created one."
       }
       $designPrompt=@"
