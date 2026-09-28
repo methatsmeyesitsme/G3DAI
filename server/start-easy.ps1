@@ -116,18 +116,22 @@ function Test-StlRequest([string]$Prompt){
   $q=$Prompt.ToLower()
   return (($q -match '\bstl\b') -or ($q -match '\.stl\b'))
 }
-function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4){
+function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4,[string]$WorkingDir="",[switch]$StlMode){
   $timeoutSeconds=300
   $run=$null
   $oldKey=$env:XAI_API_KEY
   try{
     $env:XAI_API_KEY=$null
     $run=Start-Job -ScriptBlock {
-      param($Exe,$Prompt,$Home,$Turns)
+      param($Exe,$Prompt,$Home,$Turns,$Cwd,$IsStl)
       $env:XAI_API_KEY=$null
       $env:GROK_HOME=$Home
-      & $Exe -p $Prompt --always-approve --no-auto-update --output-format plain --no-alt-screen --no-plan --no-subagents --disable-web-search --effort low --max-turns $Turns 2>&1 | Out-String
-    } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns
+      $args=@()
+      if($Cwd){$args+=@("--cwd",$Cwd)}
+      $args+=@("-p",$Prompt,"--always-approve","--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--disable-web-search","--effort","low","--max-turns",$Turns)
+      if($IsStl){$args+=@("--tools","Bash")}
+      & $Exe @args 2>&1 | Out-String
+    } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns,$WorkingDir,[bool]$StlMode
     if(-not (Wait-Job -Job $run -Timeout $timeoutSeconds)){
       Stop-Job -Job $run -ErrorAction SilentlyContinue
       throw "Grok timed out after 5 minutes. The request was stopped so G3DAI does not hang forever."
@@ -187,7 +191,7 @@ while($listener.IsListening){
       $stlName="grok-model-"+([guid]::NewGuid().ToString("N"))+".stl"
       $stlPath=Join-Path $outputDir $stlName
       $stlInstructions=if($isStl){
-        "THIS REQUEST REQUIRES A REAL STL FILE.`nYou must create the actual 3D geometry yourself using your available Grok tools. Use the terminal and scripting tools as needed.`nWrite the completed, printable STL file to this exact path:`n$stlPath`nThe file must contain the actual mesh for the requested object, use millimeters, and be a valid STL that can be opened by a slicer.`nDo not merely describe the model. Do not return only OpenSCAD, Python, or instructions.`nBefore replying, verify that the STL file exists at that exact path and is not empty.`nAfter creating and verifying it, reply with a brief summary only; do not paste the STL contents."
+        "THIS REQUEST REQUIRES A REAL STL FILE.`nImmediately create the actual printable mesh. Do not inspect the project, browse the web, plan the task, ask questions, or create an OpenSCAD/Python source file instead of the STL.`nUse the terminal with one short Python script using only the Python standard library to write the STL directly.`nWrite the completed STL to this exact path:`n$stlPath`nFor a simple primitive such as a ball, create the mesh directly with mathematically generated triangles; do not wait for external CAD software or packages.`nUse millimeters and make the STL valid and non-empty.`nAfter writing it, verify the file exists and has a size greater than 84 bytes, then reply with one brief sentence only."
       }else{
         "Answer the user normally. For design tasks, provide concrete dimensions and practical 3D-printing guidance. Do not claim to have created a file unless you actually created one."
       }
@@ -209,7 +213,7 @@ $prompt
 $stlInstructions
 "@
       try{
-        $answer=Run-Grok $designPrompt ($(if($isStl){8}else{4}))
+        if($isStl){$answer=Run-Grok $designPrompt 2 $outputDir -StlMode}else{$answer=Run-Grok $designPrompt 4}
         if($isStl -and (Test-Path $stlPath -PathType Leaf)){
           $item=Get-Item $stlPath
           if($item.Length -gt 84){
