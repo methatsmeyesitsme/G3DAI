@@ -117,10 +117,31 @@ function Test-StlRequest([string]$Prompt){
   return (($q -match '\bstl\b') -or ($q -match '\.stl\b'))
 }
 function Run-Grok([string]$DesignPrompt){
+  $timeoutSeconds=600
+  $run=$null
   $oldKey=$env:XAI_API_KEY
-  try{$env:XAI_API_KEY=$null;$output=(& $GrokExe -p $DesignPrompt --always-approve 2>&1|Out-String);$exitCode=$LASTEXITCODE}finally{$env:XAI_API_KEY=$oldKey}
-  if($exitCode -ne 0){$message=$output.Trim();if(!$message){$message="Grok exited with code $exitCode."};throw $message}
-  return $output.Trim()
+  try{
+    $env:XAI_API_KEY=$null
+    $run=Start-Job -ScriptBlock {
+      param($Exe,$Prompt,$Home)
+      $env:XAI_API_KEY=$null
+      $env:GROK_HOME=$Home
+      & $Exe -p $Prompt --always-approve --no-auto-update --output-format plain --no-alt-screen --max-turns 30 2>&1 | Out-String
+    } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome
+    if(-not (Wait-Job -Job $run -Timeout $timeoutSeconds)){
+      Stop-Job -Job $run -ErrorAction SilentlyContinue
+      throw "Grok timed out after 10 minutes. The Grok CLI did not finish the request."
+    }
+    $output=(Receive-Job -Job $run -ErrorAction SilentlyContinue | Out-String).Trim()
+    if($run.State -ne "Completed"){
+      if(!$output){$output="Grok did not complete the request."}
+      throw $output
+    }
+    return $output
+  }finally{
+    if($run){Remove-Job -Job $run -Force -ErrorAction SilentlyContinue}
+    $env:XAI_API_KEY=$oldKey
+  }
 }
 $listener=New-Object Net.HttpListener
 $listener.Prefixes.Add(("http://"+$HostAddress+":"+ $Port +"/"))
