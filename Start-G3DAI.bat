@@ -1,12 +1,16 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 set "G3DAI_SERVER=%TEMP%\g3dai-start-easy-%RANDOM%-%RANDOM%.ps1"
-set "G3DAI_SERVER_URL=https://raw.githubusercontent.com/methatsmeyesitsme/G3DAI/main/server/start-easy.ps1?cacheBust=%RANDOM%%RANDOM%"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Headers @{'Cache-Control'='no-cache'} -Uri '%G3DAI_SERVER_URL%' -OutFile '%G3DAI_SERVER%'; if(!(Test-Path '%G3DAI_SERVER%')){exit 1}; if(-not (Select-String -Path '%G3DAI_SERVER%' -Pattern 'function Extract-StlScript' -Quiet)){exit 2}; exit 0"
+set "G3DAI_SERVER_URL=https://api.github.com/repos/methatsmeyesitsme/G3DAI/contents/server/start-easy.ps1?ref=main"
+echo Updating G3DAI local server...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r=Invoke-WebRequest -UseBasicParsing -Headers @{'Accept'='application/vnd.github.raw+json';'Cache-Control'='no-cache';'User-Agent'='G3DAI'} -Uri '%G3DAI_SERVER_URL%';[IO.File]::WriteAllText('%G3DAI_SERVER%',$r.Content,(New-Object System.Text.UTF8Encoding($false)));if(-not (Select-String -Path '%G3DAI_SERVER%' -Pattern 'function Extract-StlScript' -Quiet)){throw 'Downloaded G3DAI server is not the current STL bridge.'}"
 if errorlevel 1 (
+  echo.
   echo Could not download the current G3DAI local server.
-  echo Falling back to the bundled server.
-  set "G3DAI_SERVER=%~dp0server\start-easy.ps1"
+  echo.
+  echo Make sure you are connected to the internet and try again.
+  pause
+  exit /b 1
 )
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%G3DAI_SERVER%" -Setup
 if errorlevel 1 pause
