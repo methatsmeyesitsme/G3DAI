@@ -121,36 +121,72 @@ function Test-StlRequest([string]$Prompt){
   $q=$Prompt.ToLower()
   return (($q -match '\bstl\b') -or ($q -match '\.stl\b'))
 }
-function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4,[string]$WorkingDir="",[switch]$StlMode){
-  $timeoutSeconds=300
+function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4,[string]$WorkingDir="",[switch]$PlannerMode){
+  $timeoutSeconds=if($PlannerMode){120}else{300}
   $run=$null
   $oldKey=$env:XAI_API_KEY
   try{
     $env:XAI_API_KEY=$null
     $run=Start-Job -ScriptBlock {
-      param($Exe,$Prompt,$Home,$Turns,$Cwd,$IsStl)
+      param($Exe,$Prompt,$Home,$Turns,$Cwd,$Planner)
       $env:XAI_API_KEY=$null
       $env:GROK_HOME=$Home
       $args=@()
       if($Cwd){$args+=@("--cwd",$Cwd)}
-      $args+=@("-p",$Prompt,"--always-approve","--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--disable-web-search","--effort","low","--max-turns",$Turns,"--allow","Bash(*)")
-      if($IsStl){$args+=@("--tools","Bash")}
+      $args+=@("-p",$Prompt,"--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--no-memory","--disable-web-search","--effort","low","--max-turns",$Turns)
+      if($Planner){$args+=@("--disallowed-tools","Bash,Edit,Read,Grep,WebFetch,WebSearch,MCPTool")}else{$args+=@("--always-approve")}
       & $Exe @args 2>&1 | Out-String
-    } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns,$WorkingDir,[bool]$StlMode
-    if(-not (Wait-Job -Job $run -Timeout $timeoutSeconds)){
-      Stop-Job -Job $run -ErrorAction SilentlyContinue
-      throw "Grok timed out after 5 minutes. The request was stopped so G3DAI does not hang forever."
-    }
+    } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns,$WorkingDir,[bool]$PlannerMode
+    if(-not (Wait-Job -Job $run -Timeout $timeoutSeconds)){Stop-Job -Job $run -ErrorAction SilentlyContinue;throw "Grok timed out before returning the model build instructions."}
     $output=(Receive-Job -Job $run -ErrorAction SilentlyContinue | Out-String).Trim()
-    if($run.State -ne "Completed"){
-      if(!$output){$output="Grok did not complete the request."}
-      throw $output
-    }
+    if($run.State -ne "Completed"){if(!$output){$output="Grok did not complete the request."};throw $output}
     return $output
-  }finally{
-    if($run){Remove-Job -Job $run -Force -ErrorAction SilentlyContinue}
-    $env:XAI_API_KEY=$oldKey
-  }
+  }finally{if($run){Remove-Job -Job $run -Force -ErrorAction SilentlyContinue};$env:XAI_API_KEY=$oldKey}
+}
+
+function Extract-StlScript([string]$Output){
+  if(!$Output){throw "Grok returned no model-building script."}
+  $m=[regex]::Match($Output,"(?s)G3DAI_STL_SCRIPT_START\s*(.*?)\s*G3DAI_STL_SCRIPT_END")
+  if(!$m.Success){throw "Grok did not return the required STL build script."}
+  $script=$m.Groups[1].Value.Trim()
+  if(!$script){throw "Grok returned an empty STL build script."}
+  return $script
+}
+
+function Test-StlFile([string]$Path){
+  if(!(Test-Path $Path -PathType Leaf)){return $false}
+  $item=Get-Item $Path
+  if($item.Length -le 84){return $false}
+  try{
+    $bytes=[IO.File]::ReadAllBytes($Path)
+    if($bytes.Length -ge 84){$count=[BitConverter]::ToUInt32($bytes,80);if($count -gt 0 -and $count -lt 10000000 -and (84 + (50 * [int64]$count)) -eq $bytes.Length){return $true}}
+    $head=[Text.Encoding]::ASCII.GetString($bytes,0,[Math]::Min($bytes.Length,256))
+    return ($head -match "(?i)^solid\b" -and $head -match "(?i)facet\s+normal")
+  }catch{return $false}
+}
+
+function Invoke-StlBuild([string]$Script,[string]$OutputDir,[string]$StlPath){
+  if($Script -match "(?i)(subprocess|os\.system|socket|urllib|requests|ftplib|ctypes|winreg|powershell|cmd\.exe|Start-Process|Invoke-WebRequest|https?://)"){throw "Grok returned a build script containing a disallowed system or network operation."}
+  $jobDir=Join-Path $OutputDir ("build-"+[guid]::NewGuid().ToString("N"))
+  New-Item -ItemType Directory -Force -Path $jobDir | Out-Null
+  $scriptPath=Join-Path $jobDir "build_model.py"
+  Set-Content -Path $scriptPath -Value $Script -Encoding UTF8
+  $py=Get-Command py.exe -ErrorAction SilentlyContinue
+  if(!$py){$py=Get-Command python.exe -ErrorAction SilentlyContinue}
+  if(!$py){$py=Get-Command python3.exe -ErrorAction SilentlyContinue}
+  if(!$py){throw "Python 3 is required to build the STL locally."}
+  $run=$null
+  try{
+    $run=Start-Job -ScriptBlock {
+      param($Python,$ScriptFile,$IsPyLauncher)
+      if($IsPyLauncher){& $Python -3 $ScriptFile 2>&1 | Out-String}else{& $Python $ScriptFile 2>&1 | Out-String}
+    } -ArgumentList $py.Source,$scriptPath,($py.Name -ieq "py.exe")
+    if(-not (Wait-Job -Job $run -Timeout 120)){Stop-Job -Job $run -ErrorAction SilentlyContinue;throw "The local STL build timed out after 2 minutes."}
+    $output=(Receive-Job -Job $run -ErrorAction SilentlyContinue | Out-String).Trim()
+    if($run.State -ne "Completed"){if($output){throw $output};throw "The local STL build did not complete."}
+    if(!(Test-StlFile $StlPath)){if($output){throw "Grok code ran, but no valid STL was found at the required path. $output"};throw "Grok code ran, but no valid STL was found at the required path."}
+    return $output
+  }finally{if($run){Remove-Job -Job $run -Force -ErrorAction SilentlyContinue};Remove-Item $jobDir -Recurse -Force -ErrorAction SilentlyContinue}
 }
 $listener=New-Object Net.HttpListener
 $listener.Prefixes.Add(("http://"+$HostAddress+":"+ $Port +"/"))
@@ -188,7 +224,7 @@ while($listener.IsListening){
       $nozzle=[string]$body.nozzle
       $material=[string]$body.material
       $lines=@()
-      if($body.history){foreach($item in @($body.history|Select-Object -Last 16)){$role=[string]$item.role;$txt=[string]$item.text;if($txt){$lines+=($role.ToUpper()+": "+$txt)}}}
+      if($body.history){foreach($item in @($body.history|Select-Object -Last 8)){$role=[string]$item.role;$txt=[string]$item.text;if($txt){$lines+=($role.ToUpper()+": "+$txt)}}}
       $contextText=if($lines.Count){$lines -join ([Environment]::NewLine+[Environment]::NewLine)}else{"(no previous messages)"}
       $isStl=Test-StlRequest $prompt
       $outputDir=Join-Path (Join-Path $HOME "Downloads") "G3DAI"
@@ -196,8 +232,8 @@ while($listener.IsListening){
       $stlName="grok-model-"+([guid]::NewGuid().ToString("N"))+".stl"
       $stlPath=Join-Path $outputDir $stlName
       $stlInstructions=if($isStl){
-        "THIS REQUEST REQUIRES A REAL STL FILE.`nYour FIRST ACTION must be a Bash command that creates the STL file. Do not reply with a plan or progress sentence before using Bash.`nDo not inspect the G3DAI workspace, repository, or other project files. Do not browse the web. Do not ask questions. Do not create OpenSCAD or Python source as the final deliverable.`nUse one short Python script through Bash, using only the Python standard library, to write the STL directly.`nWrite the completed STL to this exact path:`n$stlPath`nFor a simple primitive such as a ball, generate a watertight triangle mesh directly. Use millimeters and make the STL valid and non-empty.`nAfter the Bash command creates the STL, verify the file exists and is larger than 84 bytes. Then reply with one brief sentence only."
-      }else{
+        "Return only a real STL build script for G3DAI to execute locally. Do not execute tools and do not inspect the workspace. Do not browse the web, plan, or ask questions. Return exactly G3DAI_STL_SCRIPT_START followed by one Python 3 script and then G3DAI_STL_SCRIPT_END. The Python script must use only the standard library, generate the requested watertight mesh itself, and write the finished STL to this exact path: $stlPath. Do not create OpenSCAD, do not call shell commands, do not use subprocess, do not access the network, and do not use external packages. For a simple ball, directly generate the sphere triangle mesh and write a valid binary STL. The response must contain only the two markers and the Python script."
+      }      }else{
         "Answer the user normally. For design tasks, provide concrete dimensions and practical 3D-printing guidance. Do not claim to have created a file unless you actually created one."
       }
       $designPrompt=@"
@@ -218,7 +254,12 @@ $prompt
 $stlInstructions
 "@
       try{
-        if($isStl){$answer=Run-Grok $designPrompt 4 $outputDir -StlMode}else{$answer=Run-Grok $designPrompt 4}
+        if($isStl){
+          $answer=Run-Grok $designPrompt 2 "" -PlannerMode
+          $script=Extract-StlScript $answer
+          $answer=Invoke-StlBuild $script $outputDir $stlPath
+          if(!$answer){$answer="Grok designed the model and G3DAI built the STL locally."}
+        }else{$answer=Run-Grok $designPrompt 4}
         if($isStl -and (Test-Path $stlPath -PathType Leaf)){
           $item=Get-Item $stlPath
           if($item.Length -gt 84){
