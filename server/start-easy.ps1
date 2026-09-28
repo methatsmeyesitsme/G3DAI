@@ -133,7 +133,7 @@ function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4,[string]$WorkingDir="",
       $env:GROK_HOME=$Home
       $args=@()
       if($Cwd){$args+=@("--cwd",$Cwd)}
-      $args+=@("-p",$Prompt,"--always-approve","--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--disable-web-search","--effort","low","--max-turns",$Turns)
+      $args+=@("-p",$Prompt,"--always-approve","--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--disable-web-search","--effort","low","--max-turns",$Turns,"--allow","Bash(*)")
       if($IsStl){$args+=@("--tools","Bash")}
       & $Exe @args 2>&1 | Out-String
     } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns,$WorkingDir,[bool]$StlMode
@@ -196,7 +196,7 @@ while($listener.IsListening){
       $stlName="grok-model-"+([guid]::NewGuid().ToString("N"))+".stl"
       $stlPath=Join-Path $outputDir $stlName
       $stlInstructions=if($isStl){
-        "THIS REQUEST REQUIRES A REAL STL FILE.`nImmediately create the actual printable mesh. Do not inspect the project, browse the web, plan the task, ask questions, or create an OpenSCAD/Python source file instead of the STL.`nUse the terminal with one short Python script using only the Python standard library to write the STL directly.`nWrite the completed STL to this exact path:`n$stlPath`nFor a simple primitive such as a ball, create the mesh directly with mathematically generated triangles; do not wait for external CAD software or packages.`nUse millimeters and make the STL valid and non-empty.`nAfter writing it, verify the file exists and has a size greater than 84 bytes, then reply with one brief sentence only."
+        "THIS REQUEST REQUIRES A REAL STL FILE.`nYour FIRST ACTION must be a Bash command that creates the STL file. Do not reply with a plan or progress sentence before using Bash.`nDo not inspect the G3DAI workspace, repository, or other project files. Do not browse the web. Do not ask questions. Do not create OpenSCAD or Python source as the final deliverable.`nUse one short Python script through Bash, using only the Python standard library, to write the STL directly.`nWrite the completed STL to this exact path:`n$stlPath`nFor a simple primitive such as a ball, generate a watertight triangle mesh directly. Use millimeters and make the STL valid and non-empty.`nAfter the Bash command creates the STL, verify the file exists and is larger than 84 bytes. Then reply with one brief sentence only."
       }else{
         "Answer the user normally. For design tasks, provide concrete dimensions and practical 3D-printing guidance. Do not claim to have created a file unless you actually created one."
       }
@@ -218,7 +218,7 @@ $prompt
 $stlInstructions
 "@
       try{
-        if($isStl){$answer=Run-Grok $designPrompt 2 $outputDir -StlMode}else{$answer=Run-Grok $designPrompt 4}
+        if($isStl){$answer=Run-Grok $designPrompt 4 $outputDir -StlMode}else{$answer=Run-Grok $designPrompt 4}
         if($isStl -and (Test-Path $stlPath -PathType Leaf)){
           $item=Get-Item $stlPath
           if($item.Length -gt 84){
