@@ -1,7 +1,0 @@
-{
-  "name": "g3dai-server",
-  "private": true,
-  "type": "module",
-  "scripts": { "start": "node index.js" },
-  "engines": { "node": ">=20" }
-}
