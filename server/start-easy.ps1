@@ -133,7 +133,7 @@ function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4,[string]$WorkingDir="",
       $env:GROK_HOME=$Home
       $args=@()
       if($Cwd){$args+=@("--cwd",$Cwd)}
-      $args+=@("-p",$Prompt,"--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--no-memory","--disable-web-search","--effort","low","--max-turns",$Turns)
+      $args+=@("-p",$Prompt,"-m","grok-4.5","--no-auto-update","--output-format","plain","--no-alt-screen","--no-plan","--no-subagents","--no-memory","--disable-web-search","--effort","low","--max-turns",$Turns,"--system-prompt-override",$(if($Planner){"You are a fast STL code generator. Return only the exact requested G3DAI build-script markers and Python code."}else{"You are a fast 3D design assistant. Answer directly and concisely."}))
       if($Planner){$args+=@("--disallowed-tools","Bash,Edit,Read,Grep,WebFetch,WebSearch,MCPTool")}else{$args+=@("--always-approve")}
       & $Exe @args 2>&1 | Out-String
     } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns,$WorkingDir,[bool]$PlannerMode
@@ -224,7 +224,7 @@ while($listener.IsListening){
       $nozzle=[string]$body.nozzle
       $material=[string]$body.material
       $lines=@()
-      if($body.history){foreach($item in @($body.history|Select-Object -Last 8)){$role=[string]$item.role;$txt=[string]$item.text;if($txt){$lines+=($role.ToUpper()+": "+$txt)}}}
+      if($body.history){foreach($item in @($body.history|Select-Object -Last 4)){$role=[string]$item.role;$txt=[string]$item.text;if($txt){$lines+=($role.ToUpper()+": "+$txt)}}}
       $contextText=if($lines.Count){$lines -join ([Environment]::NewLine+[Environment]::NewLine)}else{"(no previous messages)"}
       $isStl=Test-StlRequest $prompt
       $outputDir=Join-Path (Join-Path $HOME "Downloads") "G3DAI"
@@ -255,7 +255,7 @@ $stlInstructions
 "@
       try{
         if($isStl){
-          $answer=Run-Grok $designPrompt 2 "" -PlannerMode
+          $answer=Run-Grok $designPrompt 1 "" -PlannerMode
           $script=Extract-StlScript $answer
           $answer=Invoke-StlBuild $script $outputDir $stlPath
           if(!$answer){$answer="Grok designed the model and G3DAI built the STL locally."}
