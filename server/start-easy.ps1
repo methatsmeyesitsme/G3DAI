@@ -116,21 +116,21 @@ function Test-StlRequest([string]$Prompt){
   $q=$Prompt.ToLower()
   return (($q -match '\bstl\b') -or ($q -match '\.stl\b'))
 }
-function Run-Grok([string]$DesignPrompt){
-  $timeoutSeconds=600
+function Run-Grok([string]$DesignPrompt,[int]$MaxTurns=4){
+  $timeoutSeconds=300
   $run=$null
   $oldKey=$env:XAI_API_KEY
   try{
     $env:XAI_API_KEY=$null
     $run=Start-Job -ScriptBlock {
-      param($Exe,$Prompt,$Home)
+      param($Exe,$Prompt,$Home,$Turns)
       $env:XAI_API_KEY=$null
       $env:GROK_HOME=$Home
-      & $Exe -p $Prompt --always-approve --no-auto-update --output-format plain --no-alt-screen --max-turns 30 2>&1 | Out-String
-    } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome
+      & $Exe -p $Prompt --always-approve --no-auto-update --output-format plain --no-alt-screen --no-plan --no-subagents --disable-web-search --effort low --max-turns $Turns 2>&1 | Out-String
+    } -ArgumentList $GrokExe,$DesignPrompt,$GrokHome,$MaxTurns
     if(-not (Wait-Job -Job $run -Timeout $timeoutSeconds)){
       Stop-Job -Job $run -ErrorAction SilentlyContinue
-      throw "Grok timed out after 10 minutes. The Grok CLI did not finish the request."
+      throw "Grok timed out after 5 minutes. The request was stopped so G3DAI does not hang forever."
     }
     $output=(Receive-Job -Job $run -ErrorAction SilentlyContinue | Out-String).Trim()
     if($run.State -ne "Completed"){
@@ -209,7 +209,7 @@ $prompt
 $stlInstructions
 "@
       try{
-        $answer=Run-Grok $designPrompt
+        $answer=Run-Grok $designPrompt ($(if($isStl){8}else{4}))
         if($isStl -and (Test-Path $stlPath -PathType Leaf)){
           $item=Get-Item $stlPath
           if($item.Length -gt 84){
@@ -222,49 +222,6 @@ $stlInstructions
         }
       }catch{Send-Json $context 500 @{error=$_.Exception.Message}}
 
-    }
-    Send-Text $context 404 "Not found" "text/plain; charset=utf-8"
-  }catch{try{Send-Text $context 500 $_.Exception.Message "text/plain; charset=utf-8"}catch{}}
-  }
-$listener.Stop()
-$listener.Close()){
-        Send-Text $context 400 "Invalid file name" "text/plain; charset=utf-8"
-        continue
-      }
-      $fileRoot=Join-Path (Join-Path $HOME "Downloads") "G3DAI"
-      $filePath=Join-Path $fileRoot $fileName
-      Send-File $context $filePath $fileName
-      continue
-    }
-    if($path -eq "/api/grok/chat" -and $method -eq "POST"){
-      if(!(Test-Path $AuthFile)){Send-Json $context 401 @{error="Grok is not signed in yet. Press Connect and sign in in your browser."};continue}
-      $body=Read-JsonBody $context
-      $prompt=[string]$body.prompt
-      $printer=[string]$body.printer
-      $nozzle=[string]$body.nozzle
-      $material=[string]$body.material
-      $lines=@()
-      if($body.history){foreach($item in @($body.history|Select-Object -Last 16)){$role=[string]$item.role;$txt=[string]$item.text;if($txt){$lines+=($role.ToUpper()+": "+$txt)}}}
-      $contextText=if($lines.Count){$lines -join ([Environment]::NewLine+[Environment]::NewLine)}else{"(no previous messages)"}
-      $designPrompt=@"
-You are G3DAI, a professional 3D modeling and 3D printing design partner.
-Help the user create real, printable 3D models.
-Think in exact dimensions, clearances, tolerances, wall thicknesses, print orientation, supports, infill, material, and assembly.
-When useful, provide complete directly usable OpenSCAD or Blender Python code.
-Never claim an STL exists unless a real file or complete reproducible model data is actually provided.
-
-Printer: $printer
-Nozzle: $nozzle mm
-Material: $material
-
-Conversation:
-$contextText
-
-Current user request:
-$prompt
-"@
-      try{$answer=Run-Grok $designPrompt;Send-Json $context 200 @{ok=$true;output=$answer}}catch{Send-Json $context 500 @{error=$_.Exception.Message}}
-      continue
     }
     Send-Text $context 404 "Not found" "text/plain; charset=utf-8"
   }catch{try{Send-Text $context 500 $_.Exception.Message "text/plain; charset=utf-8"}catch{}}
