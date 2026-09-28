@@ -11,7 +11,15 @@ if(!(Test-Path $IndexPath -PathType Leaf)){
     $probe=Split-Path -Parent $probe
   }
 }
-if(!$IndexPath){throw "G3DAI index.html could not be found."}
+if(!$IndexPath){
+  $IndexPath=Join-Path $env:TEMP "g3dai-index.html"
+  try{
+    Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/methatsmeyesitsme/G3DAI/main/index.html" -OutFile $IndexPath -TimeoutSec 20
+  }catch{
+    throw "G3DAI index.html could not be found locally and could not be downloaded from GitHub."
+  }
+  if(!(Test-Path $IndexPath -PathType Leaf)){throw "G3DAI index.html could not be found."}
+}
 $Port=8787
 $HostAddress="127.0.0.1"
 $GrokHome=if($env:GROK_HOME){$env:GROK_HOME}else{Join-Path $HOME ".grok"}
