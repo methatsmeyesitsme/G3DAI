@@ -42,6 +42,13 @@ if($Setup){
   Copy-Item $IndexPath (Join-Path $InstallDir "index.html") -Force
   Copy-Item $PSCommandPath (Join-Path $InstallServer "start-easy.ps1") -Force
   $InstalledScript=Join-Path $InstallServer "start-easy.ps1"
+  try{
+    $running=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+      $_.CommandLine -and $_.CommandLine -like ("*" + $InstalledScript + "*")
+    }
+    foreach($proc in @($running)){try{Stop-Process -Id ([int]$proc.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}}
+    if(@($running).Count){Start-Sleep -Milliseconds 500}
+  }catch{}
   $Startup=Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
   New-Item -ItemType Directory -Force -Path $Startup | Out-Null
   $ShortcutPath=Join-Path $Startup "G3DAI.lnk"
@@ -54,10 +61,8 @@ if($Setup){
   $sc.Save()
   $taskName="G3DAI Local Server"
   if(Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue){Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue}
-  if(!(Is-G3DAIRunning)){
-    Start-Process -FilePath (Get-Command powershell.exe).Source -WindowStyle Hidden -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-WindowStyle","Hidden","-File",$InstalledScript,"-NoBrowser")
-    Start-Sleep -Seconds 2
-  }
+  Start-Process -FilePath (Get-Command powershell.exe).Source -WindowStyle Hidden -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-WindowStyle","Hidden","-File",$InstalledScript,"-NoBrowser")
+  Start-Sleep -Seconds 2
   Start-Process ("http://"+$HostAddress+":"+ $Port +"/")
   Write-Host ""
   Write-Host "G3DAI is installed." -ForegroundColor Green
