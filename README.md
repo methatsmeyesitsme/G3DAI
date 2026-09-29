@@ -17,13 +17,13 @@ The GitHub Pages deployment now serves the real application directly from `index
 - Abortable generation (Stop cancels the in-flight request)
 - Honest connection status when a Grok inference backend is unavailable
 
-## Grok authentication
+## Grok connection
 
-The app deliberately does **not** ask for or store an `XAI_API_KEY`, and it does not pretend that a grok.com account is connected.
+G3DAI supports a server-side xAI API connection as its primary hosted backend. The frontend never receives the API credential. The backend uses the current xAI API model configuration and can fall back to the local Grok CLI connection when no server API credential is configured.
 
-Current xAI documentation exposes API inference authenticated by API key and interactive session authentication for Grok Build/CLI. It does not document a public OAuth flow for arbitrary third-party web apps to consume a user's personal grok.com inference session. The GitHub Pages frontend therefore fails closed instead of collecting credentials or faking an AI connection.
+xAI's public inference API currently authenticates with an API key and supports Grok 4.7. API billing is separate from the consumer Grok subscription. citeturn950273search0turn950273search2
 
-A real Grok-powered deployment needs a supported server-side session/inference integration. GitHub Pages alone cannot provide that backend.
+For local-only use without an API credential, the existing Grok CLI connection remains available as a fallback.
 
 ## Geometry
 
@@ -40,6 +40,6 @@ The repository now also contains a Node 20 backend under `server/`. It provides 
 
 The provider adapter intentionally fails closed. No personal Grok password, browser cookie, scraped session, or API key is collected by G3DAI. A real xAI-supported third-party authentication/inference bridge can be connected to the adapter when xAI documents one.
 
-## Current honest status
+## Current status
 
-The application and backend foundations are real. The remaining external dependency is the provider authorization mechanism: xAI's current public documentation does not expose a consumer-grok.com OAuth flow that lets an arbitrary third-party website consume the user's Grok subscription for inference. xAI documents shared xAI/Grok accounts but separate API billing, and its non-key interactive authentication documentation is for Grok Build/CLI rather than a generic third-party web-app inference API.
+The project keeps the existing chat, model-preview, printer-settings, attachment, mobile-panel, cancellation, and UI fixes while allowing the Grok connection layer to use the newer server-side API architecture.
