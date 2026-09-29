@@ -1,20 +1,35 @@
 {
   "manifest_version": 3,
   "name": "G3DAI Grok Connector",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Connects G3DAI to an already signed-in Grok browser session. No API key or password is collected.",
-  "permissions": ["tabs"],
-  "host_permissions": ["https://grok.com/*", "https://methatsmeyesitsme.github.io/G3DAI/*"],
-  "background": {"service_worker": "background.js"},
+  "permissions": [
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://grok.com/*",
+    "https://methatsmeyesitsme.github.io/G3DAI/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://grok.com/*"],
-      "js": ["grok.js"],
+      "matches": [
+        "https://grok.com/*"
+      ],
+      "js": [
+        "grok.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://methatsmeyesitsme.github.io/G3DAI/*"],
-      "js": ["g3dai.js"],
+      "matches": [
+        "https://methatsmeyesitsme.github.io/G3DAI/*"
+      ],
+      "js": [
+        "g3dai.js"
+      ],
       "run_at": "document_idle"
     }
   ]

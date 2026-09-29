@@ -32,7 +32,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     const finish = (payload) => sendResponseSafe(sendResponse,payload);
 
-    Promise.resolve(api.tabs.query({url:"https://grok.com/*"}))
+    Promise.resolve(api.tabs.query({url:["https://grok.com/*"]}))
       .then((tabs) => {
         const tab = tabs && tabs[0];
         grokTabId = tab?.id ?? grokTabId;
