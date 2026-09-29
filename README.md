@@ -19,11 +19,11 @@ The GitHub Pages deployment now serves the real application directly from `index
 
 ## Grok connection
 
-G3DAI supports a server-side xAI API connection as its primary hosted backend. The frontend never receives the API credential. The backend uses the current xAI API model configuration and can fall back to the local Grok CLI connection when no server API credential is configured.
+G3DAI's primary user connection is the **G3DAI Grok Connector browser extension**. You sign into your normal Grok account at `grok.com`, keep the Grok tab open, and G3DAI sends prompts to that signed-in browser session through the extension.
 
-xAI's public inference API currently authenticates with an API key and supports Grok 4.7. API billing is separate from the consumer Grok subscription. citeturn950273search0turn950273search2
+G3DAI does not ask for your Grok password and does not require an xAI API key in the browser. The Windows local launcher is not required for this browser-session connection.
 
-For local-only use without an API credential, the existing Grok CLI connection remains available as a fallback.
+The connector depends on the Grok website's current page controls. If Grok changes those controls, the extension may need an update.
 
 ## Geometry
 
@@ -42,4 +42,4 @@ The provider adapter intentionally fails closed. No personal Grok password, brow
 
 ## Current status
 
-The project keeps the existing chat, model-preview, printer-settings, attachment, mobile-panel, cancellation, and UI fixes while allowing the Grok connection layer to use the newer server-side API architecture.
+The project keeps the existing chat, model-preview, printer-settings, attachment, mobile-panel, cancellation, editing, retry, and UI fixes while using the signed-in Grok browser-session connection.
