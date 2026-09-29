@@ -10,6 +10,10 @@ const HOST = process.env.HOST || "127.0.0.1";
 const GROK_HOME = process.env.GROK_HOME || join(homedir(), ".grok");
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "https://methatsmeyesitsme.github.io";
 const MAX_BODY = 2 * 1024 * 1024;
+const XAI_API_KEY = process.env.XAI_API_KEY || "";
+const XAI_BASE_URL = (process.env.XAI_BASE_URL || "https://api.x.ai/v1").replace(/\/+$/, "");
+const XAI_MODEL = process.env.XAI_MODEL || "grok-4.7";
+const API_MODE = !!XAI_API_KEY;
 
 mkdirSync(GROK_HOME, { recursive: true });
 
@@ -109,13 +113,48 @@ function extractDeviceInfo(output) {
   return { output: text.trim(), url: urls[0] || null, code };
 }
 
+async function isApiAuthenticated() {
+  if (!XAI_API_KEY) return false;
+  try {
+    const r = await fetch(XAI_BASE_URL + "/models", {
+      headers: { Authorization: "Bearer " + XAI_API_KEY }
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function isAuthenticated() {
+  if (API_MODE) return isApiAuthenticated();
   try {
     await run("grok", ["models"], 30_000);
     return true;
   } catch {
     return false;
   }
+}
+
+async function runApiChat(messages) {
+  const r = await fetch(XAI_BASE_URL + "/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + XAI_API_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: XAI_MODEL,
+      messages,
+      stream: false
+    })
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(data?.error?.message || "Grok API request failed (" + r.status + ").");
+  }
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string") throw new Error("Grok API returned no text response.");
+  return text.trim();
 }
 
 let loginProcess = null;
@@ -201,6 +240,25 @@ async function chat(res, body, origin) {
   ].join("\n");
 
   try {
+    if (API_MODE) {
+      const history = Array.isArray(body.history) ? body.history.slice(-12) : [];
+      const messages = [
+        { role: "system", content: "You are G3DAI, a professional 3D model designer and 3D-printing engineering assistant. Give concrete, dimension-aware, printable design guidance. Do not claim an STL exists unless G3DAI actually generated one." },
+        ...history
+          .filter(x => x && (x.role === "user" || x.role === "assistant") && String(x.text || "").trim())
+          .map(x => ({ role: x.role, content: String(x.text).slice(0, 12000) })),
+        { role: "user", content: designPrompt }
+      ];
+      const output = await runApiChat(messages);
+      return send(res, 200, {
+        chatId,
+        sessionId,
+        output,
+        model: XAI_MODEL,
+        connection: "xai-api"
+      }, origin);
+    }
+
     const result = await run("grok", [
       "--no-auto-update",
       "-m", "grok-4.7",
@@ -214,7 +272,8 @@ async function chat(res, body, origin) {
       chatId,
       sessionId,
       output: result.stdout.trim(),
-      model: "grok-4.7"
+      model: "grok-4.7",
+      connection: "grok-cli"
     }, origin);
   } catch (error) {
     send(res, 500, { error: error.message || "Grok request failed." }, origin);
@@ -247,8 +306,9 @@ async function route(req, res) {
     return send(res, 200, {
       ok: true,
       provider: "Grok",
-      apiKeyRequired: false,
-      mode: "local"
+      apiKeyRequired: API_MODE,
+      mode: API_MODE ? "xai-api" : "local",
+      connection: API_MODE ? "xai-api" : "grok-cli"
     }, origin);
   }
 
@@ -257,14 +317,25 @@ async function route(req, res) {
 
     return send(res, 200, {
       authenticated,
-      apiKeyRequired: false,
-      authMethod: "grok-cli-oauth",
-      storage: GROK_HOME,
-      mode: "local"
+      apiKeyRequired: API_MODE,
+      authMethod: API_MODE ? "xai-api-server-secret" : "grok-cli-oauth",
+      storage: API_MODE ? "server-env" : GROK_HOME,
+      mode: API_MODE ? "xai-api" : "local",
+      connection: API_MODE ? "xai-api" : "grok-cli"
     }, origin);
   }
 
   if (req.url === "/api/grok/login" && req.method === "POST") {
+    if (API_MODE) {
+      const authenticated = await isApiAuthenticated();
+      return send(res, authenticated ? 200 : 503, {
+        authenticated,
+        connection: "xai-api",
+        message: authenticated
+          ? "Grok API is configured on the server."
+          : "The server does not have a working xAI API key."
+      }, origin);
+    }
     return startDeviceLogin(res, origin);
   }
 
