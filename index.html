@@ -32,11 +32,364 @@
     g3daiOpenModal('<h2>Delete chat?</h2><div class="notice">Delete <b>'+safeTitle+'</b>? This cannot be undone.</div><div class="actions"><button id="cancelDelete">Cancel</button><button id="confirmDelete" class="primary">Delete</button></div>');
     var cancel=document.getElementById('cancelDelete'),confirmBtn=document.getElementById('confirmDelete');
     if(cancel)cancel.onclick=window.__g3daiCloseModal;
-    if(confirmBtn)confirmBtn.onclick=function(e){if(e){e.preventDefault();e.stopPropagation()}modal.classList.remove('show');if(typeof window.__g3daiDeleteChatNow==='function')window.__g3daiDeleteChatNow(id);else{try{var state=readState(),list=Array.isArray(state.chats)?state.chats:[],index=list.findIndex(function(x){return String(x.id)===String(id)});if(index>=0){list.splice(index,1);state.chats=list;if(state.active===id)state.active=list[0]?list[0].id:null;persistState(state);renderSavedChats();if(state.active)window.__g3daiOpenSavedChat(state.active);else renderStandaloneChatMessages(null)}}catch(e){}}};
+    if(confirmBtn)confirmBtn.onclick=function(e){if(e){e.preventDefault();e.stopPropagation()}modal.classList.remove('show');if(typeof window.__g3daiDeleteChatNow==='function')window.__g3daiDeleteChatNow(id);else{try{var state=readState(),list=Array.isArray(state.chats)?state.chats:[],index=list.findIndex(function(x){return String(x.id)===String(id)});if(index>=0){list.splice(index,1);state.chats=list;if(String(state.active)===String(id))state.active=null;persistState(state);renderSavedChats();renderStandaloneChatMessages({messages:[]})}}catch(_){}}};
+  }
+  window.__g3daiFallbackSearch=function(){var s=readState(),q=window.prompt('Search chats');if(!q)return;var matches=(s.chats||[]).filter(function(x){return String(x.title||'').toLowerCase().includes(q.toLowerCase())});window.alert(matches.length?matches.map(function(x){return x.title||'New Chat'}).join('\n'):'No matches')};
+  window.__g3daiFallbackProjects=function(){g3daiOpenModal('<h2>Projects</h2><div class="notice">Your chats and Grok-generated model history are saved in this browser.</div><div class="actions"><button id="fallbackProjectsClose" class="primary" type="button">Close</button></div>');var b=document.getElementById('fallbackProjectsClose');if(b)b.onclick=window.__g3daiCloseModal};
+  window.__g3daiHandleSend=async function(e){
+    if(e){e.preventDefault();e.stopPropagation()}
+    if(window.__g3daiGenerationActive){
+      if(typeof window.__g3daiStopGeneration==='function')return window.__g3daiStopGeneration();
+      return;
+    }
+    if(typeof window.__g3daiSend==='function')return window.__g3daiSend();
+    var prompt=document.getElementById('prompt'),status=document.getElementById('status');if(!prompt)return;var text=prompt.value.trim();if(!text)return;prompt.value='';
+    var state=readState();state.chats=Array.isArray(state.chats)?state.chats:[];var chat=state.chats.find(function(x){return String(x.id)===String(state.active)});
+    if(!chat){chat={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),title:'New Chat',messages:[],models:[],updated:Date.now()};state.chats.unshift(chat);state.active=chat.id}
+    chat.messages=Array.isArray(chat.messages)?chat.messages:[];chat.models=Array.isArray(chat.models)?chat.models:[];chat.messages.push({role:'user',text:text,at:Date.now()});persistState(state);if(status)status.textContent='Grok: Thinking…';
+    try{
+      var resp=await fetch('http://127.0.0.1:8787/api/grok/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:chat.id,prompt:text,history:chat.messages.map(function(x){return {role:x.role,text:x.text}}),printer:(state.settings&&state.settings.printer)||'Bambu Lab P2S',nozzle:(state.settings&&state.settings.nozzle)||'0.4',material:(state.settings&&state.settings.material)||'PLA'})});
+      var data={};try{data=await resp.json()}catch(_){}if(!resp.ok)throw new Error(data.error||'Grok request failed');
+      if(data.stlGenerated&&data.url)chat.models.push({version:String(chat.models.length+1).padStart(2,'0'),prompt:text,name:data.name||'Grok Model',type:'stl',fileName:data.fileName,fileUrl:'http://127.0.0.1:8787'+data.url,grokGenerated:true});
+      chat.messages.push({role:'assistant',text:String(data.output||'Grok returned an empty response.'),at:Date.now()});chat.updated=Date.now();persistState(state);if(status)status.textContent='Grok: connected';renderSavedChats();window.location.reload();
+    }catch(err){chat.messages.push({role:'assistant',text:'Grok error: '+err.message,at:Date.now()});persistState(state);if(status)status.textContent='Grok: error';renderStandaloneChatMessages(chat)}
   };
-  // Note: full script continues from previous working version; core UI and chat logic restored.
-  window.addEventListener('pagehide',function(){});
-  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'){}});
-  // applyTheme();render();refreshGrok();
+  (function installFallbackLeftActions(){var search=document.getElementById('search'),projects=document.getElementById('projects');if(search)search.addEventListener('click',function(){if(window.__g3daiModuleReady)return;window.__g3daiFallbackSearch()});if(projects)projects.addEventListener('click',function(){if(window.__g3daiModuleReady)return;window.__g3daiFallbackProjects()})})();
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){window.__g3daiApplyMenu();window.__g3daiApplyRightMenu();renderSavedChats()},{once:true})}else{window.__g3daiApplyMenu();window.__g3daiApplyRightMenu();renderSavedChats()}
 })();
+</script>
+<script type="module">
+import * as THREE from 'three';import{OrbitControls}from'three/addons/controls/OrbitControls.js';import{STLLoader}from'three/addons/loaders/STLLoader.js';
+const $=x=>document.getElementById(x),KEY='g3dai.state.v3',CHAT_KEY='g3dai.chats.v1';let S=(function(){try{return JSON.parse(localStorage.getItem(KEY)||'null')||null}catch(e){return null}})();
+if(!S){try{let legacy=JSON.parse(localStorage.getItem(CHAT_KEY)||'null');S={chats:Array.isArray(legacy)?legacy:[],active:null,settings:{printer:'Bambu Lab P2S',nozzle:'0.4',material:'PLA',theme:'dark'},grok:{connected:false,backendUrl:''},ui:{leftClosed:false,rightClosed:false}}}catch(e){S={chats:[],active:null,settings:{printer:'Bambu Lab P2S',nozzle:'0.4',material:'PLA',theme:'dark'},grok:{connected:false,backendUrl:''},ui:{leftClosed:false,rightClosed:false}}}};
+let scene,camera,renderer,controls,mesh,job=null,thinking=false;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));localStorage.setItem(CHAT_KEY,JSON.stringify(S.chats||[]))}catch(e){}};
+const uid=()=>crypto.randomUUID();
+function hydrateChats(){
+  if(!Array.isArray(S.chats))S.chats=[];
+  S.chats=S.chats.map(c=>({id:c&&c.id?c.id:uid(),title:c&&c.title?c.title:'New Chat',messages:Array.isArray(c&&c.messages)?c.messages:[],models:Array.isArray(c&&c.models)?c.models:[],updated:Number(c&&c.updated)||Date.now()}));  return S.chats;
+}
+S.settings=Object.assign({printer:'Bambu Lab P2S',nozzle:'0.4',material:'PLA',theme:'dark'},S.settings||{});S.grok=Object.assign({connected:false,backendUrl:''},S.grok||{});S.ui=Object.assign({leftClosed:false,rightClosed:false},S.ui||{});function applyTheme(){document.body.classList.toggle('light',S.settings.theme==='light')}function chat(){
+  let current=Array.isArray(S.chats)?S.chats.find(x=>String(x.id)===String(S.active)):null;
+  if(current)return current;
+  if(!Array.isArray(S.chats))S.chats=[];
+  let c={id:uid(),title:'New Chat',messages:[],models:[],updated:Date.now()};
+  S.chats.unshift(c);
+  S.active=c.id;
+  save();
+  return c;
+}
+function instantChatTitle(c){
+  if(!c||!Array.isArray(c.messages))return 'New Chat';
+  let first=c.messages.find(x=>x&&x.role==='user'&&String(x.text||'').trim());
+  let p=String(first&&first.text||'').trim();
+  if(!p)return 'New Chat';
+  p=p.replace(/https?:\\/\\/\\S+/gi,'').replace(/[^a-zA-Z0-9\\s-]/g,' ').replace(/\\s+/g,' ').trim();
+  let words=p.split(' ').filter(Boolean);
+  let stop=new Set(['make','create','build','design','generate','an','a','the','me','my','please','can','you','i','want','to','of','for','with','and','that','this','actual','real','model','stl','file']);
+  let useful=words.filter(w=>!stop.has(w.toLowerCase()));
+  if(!useful.length)useful=words;
+  let title=useful.slice(0,4).map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+  return title||'New Chat';
+}
+function setChatTitle(c,title){
+  if(!c||c.title!=='New Chat'||!title)return;
+  let cleaned=String(title).replace(/^[\"'\\s]+|[\"'\\s]+$/g,'').replace(/\\s+/g,' ').trim();
+  let words=cleaned.split(/\\s+/).filter(Boolean).slice(0,5);
+  c.title=words.join(' ')||'New Chat';
+  c.updated=Date.now();
+  save();
+  render();
+}
+async function nameChatWithGrok(c){
+  if(!c||c.title!=='New Chat')return;
+  let instant=instantChatTitle(c);
+  if(instant!=='New Chat')setChatTitle(c,instant);
+}
+function add(role,text){
+  let c=chat();
+  if(!c)return;
+  c.messages=Array.isArray(c.messages)?c.messages:[];
+  c.messages.push({role,text,at:Date.now()});
+  c.updated=Date.now();
+  S.active=c.id;
+  save();
+  renderActiveChatMessages(c);
+  render();
+}
+function deleteChatNow(id){
+  let index=S.chats.findIndex(x=>String(x.id)===String(id));if(index<0)return;
+  let wasActive=String(S.active)===String(id);
+  S.chats.splice(index,1);
+  if(wasActive)S.active=null;
+  thinking=false;
+  if($('prompt'))$('prompt').value='';
+  save();
+  render();
+}
+window.__g3daiDeleteChatNow=deleteChatNow;
+window.__g3daiRequestDeleteChat=function(id){
+  let target=S.chats.find(x=>String(x.id)===String(id));if(!target)return;
+  window.__g3daiConfirmDeleteChat(target.id,target.title||'New Chat');
+};
+function deleteChat(id){window.__g3daiRequestDeleteChat(id)}
+async function copyMessageText(text,button){try{let value=String(text||'');if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(value)}else{let ta=document.createElement('textarea');ta.value=value;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}if(button){button.title='Copied';button.setAttribute('aria-label','Copied');setTimeout(()=>{button.title='Copy';button.setAttribute('aria-label','Copy message')},900)}}catch(e){}}
+async function resendEditedPrompt(index,value){let p=String(value||'').trim(),c=chat();if(!c||!p||!Array.isArray(c.messages)||!c.messages[index]||c.messages[index].role!=='user'||job)return;c.messages[index].text=p;c.messages=c.messages.slice(0,index+1);c.models=[];c.updated=Date.now();save();job={cancel:false};let jobRef=job;thinking=true;render();try{let history=c.messages.map(x=>({role:x.role,text:x.text}));let d=await api('/api/grok/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:c.id,prompt:p,history,printer:S.settings.printer,nozzle:S.settings.nozzle,material:S.settings.material}),signal:jobRef.controller.signal});if(jobRef.cancel)return;thinking=false;if(d.stlGenerated&&d.url)addGrokStlModel(c,p,d);await typeAssistant(d.output||'Grok returned an empty response.',jobRef)}catch(e){thinking=false;if(!jobRef.cancel)add('assistant','Grok error: '+e.message)}finally{if(job===jobRef)job=null;updateSendButton();refreshGrok()}}
+function retryAssistantMessage(index){let c=chat(),msg=c&&c.messages&&c.messages[index];if(!msg||msg.role!=='assistant'||job)return;let userIndex=-1;for(let i=index-1;i>=0;i--){if(c.messages[i]&&c.messages[i].role==='user'){userIndex=i;break}}if(userIndex<0)return;resendEditedPrompt(userIndex,c.messages[userIndex].text)}
+function beginEditMessage(index){let c=chat(),msg=c&&c.messages&&c.messages[index];if(!msg||msg.role!=='user'||job)return;let nodes=[...document.querySelectorAll('#messages .msg')],d=nodes[index];if(!d)return;let textWrap=d.querySelector('.msg-text'),actions=d.parentElement&&d.parentElement.querySelector('.msg-actions');if(!textWrap||!actions)return;let ta=document.createElement('textarea');ta.className='edit-prompt';ta.value=String(msg.text||'');textWrap.replaceWith(ta);actions.innerHTML='';let saveBtn=document.createElement('button');saveBtn.type='button';saveBtn.textContent='Save & resend';saveBtn.onclick=()=>resendEditedPrompt(index,ta.value);let cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.textContent='Cancel';cancelBtn.onclick=()=>render();actions.append(saveBtn,cancelBtn);ta.focus();ta.select()}
+async function typeAssistant(text,jobRef){let c=chat(),msg={role:'assistant',text:'',at:Date.now()};c.messages.push(msg);c.updated=Date.now();save();thinking=false;render();let el=[...document.querySelectorAll('#messages .assistant')].at(-1),textEl=el&&el.querySelector('.msg-text');if(!textEl)return;let full=String(text||''),total=full.length,chunk=Math.max(2,Math.min(7,Math.ceil(total/450))),delay=10;for(let i=0;i<total;i+=chunk){if(jobRef.cancel)return;msg.text=full.slice(0,Math.min(total,i+chunk));textEl.textContent=msg.text;let caret=document.createElement('span');caret.className='typewriter-caret';textEl.appendChild(caret);await new Promise(r=>setTimeout(r,delay))}textEl.textContent=full;save();render()}
+function render(){
+  applyTheme();
+  syncMenus();
+  let c=Array.isArray(S.chats)&&S.active!=null?S.chats.find(x=>String(x.id)===String(S.active)):null;
+  if($('title'))$('title').textContent=c?(c.title||'New Chat'):'New Chat';
+  renderActiveChatMessages(c||{messages:[]});
+  let h=$('history');
+  h.innerHTML='';
+  S.chats.sort((a,b)=>b.updated-a.updated).forEach(x=>{
+    let row=document.createElement('div');
+    row.className='chatrow';
+    let b=document.createElement('button');
+    b.className='chat '+(String(x.id)===String(S.active)?'active':'');
+    b.type='button';
+    b.textContent=x.title||'New Chat';
+    b.onclick=e=>{if(e){e.preventDefault();e.stopPropagation();}window.__g3daiOpenChat(x.id)};
+    let del=document.createElement('button');
+    del.className='deletechat';
+    del.type='button';
+    del.title='Delete chat';
+    del.setAttribute('aria-label','Delete '+(x.title||'New Chat'));
+    del.textContent='×';
+    del.onclick=e=>{e.preventDefault();e.stopPropagation();deleteChat(x.id)};
+    row.append(b,del);
+    h.appendChild(row);
+  });
+  $('status').textContent='Grok: '+(thinking?'Thinking…':(S.grok.connected?'connected':'not connected'));
+  if(c&&c.models&&c.models.length)showLast(c); 
+  if(thinking||(c&&c.messages&&c.messages.length))$('messages').scrollTo({top:$('messages').scrollHeight,behavior:'smooth'});
+}
+function renderActiveChatMessages(c){
+  let m=$('messages');if(!m)return;c=c||{messages:[]};c.messages=Array.isArray(c.messages)?c.messages:[];
+  m.innerHTML=c.messages.length?'':'<div class="empty"><div><h2>Design something real.</h2><p>Describe a printable object, its dimensions, material, or a reference.</p></div></div>';
+  c.messages.forEach((x,index)=>{
+    let row=document.createElement('div');row.className='message-row '+(x.role||'assistant');
+    let d=document.createElement('div');d.className='msg '+(x.role||'assistant');
+    let text=document.createElement('div');text.className='msg-text';text.textContent=String(x.text||'');d.appendChild(text);
+    row.appendChild(d);
+    let actions=document.createElement('div');actions.className='msg-actions';
+    let copy=document.createElement('button');copy.type='button';copy.title='Copy';copy.setAttribute('aria-label','Copy message');copy.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="12" height="12" rx="2"></rect><rect x="9" y="3" width="10" height="11" rx="2" fill="var(--p2)"></rect><rect x="9" y="3" width="10" height="11" rx="2"></rect></svg>';copy.onclick=()=>copyMessageText(x.text,copy);actions.appendChild(copy);
+    if(x.role==='user'){
+      let edit=document.createElement('button');edit.type='button';edit.title='Edit';edit.setAttribute('aria-label','Edit message');edit.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1z"></path><path d="M13.8 6.2l4 4"></path></svg>';edit.onclick=()=>beginEditMessage(index);actions.appendChild(edit);
+    }
+    if(x.role==='assistant'){
+      let retry=document.createElement('button');retry.type='button';retry.title='Retry';retry.setAttribute('aria-label','Retry response');retry.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9a8 8 0 0 1 13.2-3.4L21 8"></path><path d="M19 15a8 8 0 0 1-13.2 3.4L3 16"></path><path d="M21 4v4h-4"></path><path d="M3 20v-4h4"></path></svg>';retry.onclick=()=>retryAssistantMessage(index);actions.appendChild(retry);
+    }
+    row.appendChild(actions);m.appendChild(row);
+  });
+  if(thinking){let t=document.createElement('div');t.className='thinking';t.innerHTML='<span>Thinking</span><span class="dots"><span class="dotx"></span><span class="dotx"></span><span class="dotx"></span></span>';m.appendChild(t)}
+}
+window.__g3daiCreateNewChat=function(){
+  if(window.__g3daiGenerationActive&&typeof window.__g3daiStopGeneration==='function')window.__g3daiStopGeneration();
+  if(!Array.isArray(S.chats))S.chats=[];
+  let fresh={id:uid(),title:'New Chat',messages:[],models:[],updated:Date.now()};
+  S.chats.unshift(fresh);
+  S.active=fresh.id;
+  thinking=false;
+  save();
+  if($('prompt'))$('prompt').value='';
+  renderActiveChatMessages(fresh);
+  render();
+  closeLeftMenu();
+  if($('title'))$('title').textContent='New Chat';
+  if($('status'))$('status').textContent='Grok: '+(S.grok.connected?'connected':'not connected');
+  if($('messages'))$('messages').scrollTo({top:0,behavior:'smooth'});
+  return fresh.id;
+};
+window.__g3daiSelectChat=function(id){hydrateChats();let target=S.chats.find(x=>String(x.id)===String(id));if(!target)return;target.messages=Array.isArray(target.messages)?target.messages:[];target.models=Array.isArray(target.models)?target.models:[];S.active=target.id;thinking=false;save();if($('title'))$('title').textContent=target.title||'New Chat';renderActiveChatMessages(target);renderSavedChats();showLast();updateSendButton();closeLeftMenu();$('status').textContent='Grok: '+(S.grok.connected?'connected':'not connected');$('messages').scrollTo({top:$('messages').scrollHeight,behavior:'smooth'})};window.__g3daiOpenChat=function(id){window.__g3daiSelectChat(id)};
+async function loadGrokStl(url){let res=await fetch(url);if(!res.ok)throw new Error('Could not load the STL file');let data=await res.arrayBuffer();let geometry=new STLLoader().parse(data);geometry.computeVertexNormals();let g=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({roughness:.68,metalness:.04}));show(g);return g}
+window.__g3daiLoadGrokStl=loadGrokStl;
+function showNoModel(message){if(!renderer)init();if(mesh){scene.remove(mesh);mesh=null}let e=$('preview');e.innerHTML='<div class="empty"><div><h3>'+message+'</h3><p>The preview appears when Grok returns a real model file.</p></div></div>'}
+function init(){let e=$('preview');scene=new THREE.Scene();scene.background=new THREE.Color(0x07101a);camera=new THREE.PerspectiveCamera(45,e.clientWidth/e.clientHeight,.1,2000);camera.position.set(120,100,150);renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(e.clientWidth,e.clientHeight);e.appendChild(renderer.domElement);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;scene.add(new THREE.HemisphereLight(0xffffff,0x304060,2));let l=new THREE.DirectionalLight(0xffffff,2);l.position.set(100,150,100);scene.add(l);addEventListener('resize',()=>{camera.aspect=e.clientWidth/e.clientHeight;camera.updateProjectionMatrix();renderer.setSize(e.clientWidth,e.clientHeight)});(function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera)})()}
+function show(g){if(!renderer)init();if(mesh)scene.remove(mesh);mesh=g;scene.add(g);let b=new THREE.Box3().setFromObject(g),s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3()),mx=Math.max(s.x,s.y,s.z);g.position.sub(c);camera.position.set(mx*1.8,mx*1.5,mx*1.8);controls.target.set(0,0,0);controls.update()}
+function normalizeFileUrl(sourceUrl){let u=String(sourceUrl||'');return /^https?:\/\//i.test(u)?u:backendUrl()+u}
+function addGrokStlModel(c,p,info){if(!info||!info.fileName||!info.url)return null;c.models=Array.isArray(c.models)?c.models:[];let fileUrl=normalizeFileUrl(info.url),existing=c.models.find(x=>x.fileName===info.fileName);if(existing){S.ui=S.ui||{};S.ui.rightClosed=false;save();showModel(existing);return existing}let base=String(info.name||info.fileName).replace(/\.stl$/i,'').replace(/[-_]+/g,' ').trim();let v={version:String(c.models.length+1).padStart(2,'0'),prompt:p,name:base||'Grok Model',type:'stl',fileName:info.fileName,fileUrl:fileUrl,grokGenerated:true,dimensions:info.dimensions||null};c.models.push(v);c.updated=Date.now();S.ui=S.ui||{};S.ui.rightClosed=false;save();showModel(v);return v}
+function showModel(v){$('modelTitle').textContent=v.name+' · v'+v.version;$('modelMeta').textContent='STL · '+S.settings.material+(v.grokGenerated?' · Grok generated':'');let b=$('modelBody'),download=v.fileUrl?'<a id="dl" class="primary" href="'+v.fileUrl+'">Download STL</a>':'';b.innerHTML='<div class="card"><div class="row"><span>Version</span><b>v'+v.version+'</b></div><div class="row"><span>Printer</span><b>'+S.settings.printer+'</b></div><div class="row"><span>Nozzle</span><b>'+S.settings.nozzle+' mm</b></div><div class="row"><span>Material</span><b>'+S.settings.material+'</b></div>'+(v.dimensions?'<div class="row"><span>Size</span><b>'+v.dimensions+'</b></div>':'')+'<div class="actions">'+download+'<button id="var" class="primary">Create variation</button></div><div class="label" style="padding-left:0">Versions</div><div id="vers" class="versions"></div></div>';if(v.fileUrl)loadGrokStl(v.fileUrl).catch(function(){showNoModel('STL preview could not be loaded')});else showNoModel('No real model file returned');$('var').onclick=()=>{$('prompt').value='Modify '+v.name+': ';$('prompt').focus()};(chat().models||[]).forEach(x=>{let z=document.createElement('button');z.textContent='v'+x.version+' · '+x.name;z.onclick=()=>showModel(x);$('vers').appendChild(z)})}
+function showLast(c){c=c||((Array.isArray(S.chats)&&S.active!=null)?S.chats.find(x=>String(x.id)===String(S.active)):null);if(c&&Array.isArray(c.models)&&c.models.length)showModel(c.models[c.models.length-1])}
+const LOCAL_BACKEND='http://127.0.0.1:8787';
+function backendUrl(){let u=(S.grok&&S.grok.backendUrl||'').trim().replace(/\/+$/,'');return u||LOCAL_BACKEND}
+async function api(path,options={}){let r=await fetch(backendUrl()+path,options);let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||'G3DAI Grok bridge request failed');return d}
+async function refreshGrok(){try{let d=await api('/api/grok/status');S.grok.connected=!!d.authenticated;save();$('status').textContent='Grok: '+(S.grok.connected?'connected':'not signed in')}catch{S.grok.connected=false;$('status').textContent='Grok: start G3DAI'}}
+function updateSendButton(){
+  const b=$('send');
+  const active=!!job;
+  b.textContent=active?'■':'↑';
+  b.classList.toggle('primary',!active);
+  b.setAttribute('aria-label',active?'Stop generation':'Send message');
+  b.title=active?'Stop generation':'Send message';
+}
+window.__g3daiStopGeneration=function(){
+  if(!job){window.__g3daiGenerationActive=false;updateSendButton();return}
+  let old=job;
+  old.cancel=true;
+  try{if(old.controller)old.controller.abort()}catch(e){}
+  thinking=false;
+  job=null;
+  window.__g3daiGenerationActive=false;
+  if($('prompt')&&!$('prompt').value)$('prompt').value=old.prompt||'';
+  updateSendButton();
+  render();
+  refreshGrok();
+};
+async function send(){
+  let p=$('prompt').value.trim();if(!p||job)return;
+  let c=chat();if(!c)return;
+  c.messages=Array.isArray(c.messages)?c.messages:[];
+  c.messages.push({role:'user',text:p,at:Date.now()});
+  c.updated=Date.now();
+  S.active=c.id;
+  save();
+  $('prompt').value='';
+  job={cancel:false,controller:new AbortController(),serverJobId:null,prompt:p};window.__g3daiGenerationActive=true;let jobRef=job,startedAt=Date.now();
+  updateSendButton();
+  thinking=true;
+  renderActiveChatMessages(c);
+  renderSavedChats();
+  render();
+  if($('messages'))$('messages').scrollTo({top:$('messages').scrollHeight,behavior:'smooth'});
+  let thinkingTimer=setInterval(()=>{
+    if(!thinking)return;
+    let seconds=Math.floor((Date.now()-startedAt)/1000);
+    $('status').textContent='Grok: Thinking… '+Math.floor(seconds/60)+'m '+String(seconds%60).padStart(2,'0')+'s';
+  },1000);
+  try{
+    let history=c.messages.map(x=>({role:x.role,text:x.text}));
+    let d=await api('/api/grok/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:c.id,prompt:p,history,printer:S.settings.printer,nozzle:S.settings.nozzle,material:S.settings.material})});
+    if(jobRef.cancel)return;thinking=false;
+    if(d.stlGenerated&&d.url){addGrokStlModel(c,p,d);await typeAssistant(d.output||('Grok created the real STL file: '+d.fileName),jobRef);if(c.title==='New Chat'){c.title=(d.name||'Grok Model')+' STL';c.updated=Date.now();save()}}
+    else{await typeAssistant(d.output||'Grok returned an empty response.',jobRef);nameChatWithGrok(c)}
+  }catch(e){
+    thinking=false;
+    if(!jobRef.cancel){
+      if($('prompt')&&!$('prompt').value)$('prompt').value=jobRef.prompt||'';
+      add('assistant','Grok error: '+e.message);
+    }
+  }
+  finally{
+    if(thinkingTimer)clearInterval(thinkingTimer);
+    if(job===jobRef){job=null;window.__g3daiGenerationActive=false}
+    updateSendButton();
+    refreshGrok()
+  }
+}window.__g3daiSend=send;
+function modal(s){
+  $('modalbox').innerHTML='<button class="modal-close" type="button" aria-label="Close" onclick="window.__g3daiCloseModal(event)">×</button>'+s;
+  $('modal').classList.add('show');
+  $('modal').onclick=e=>{if(e.target===$('modal'))window.__g3daiCloseModal(e)};
+};
+function connectGrok(){
+  let poll=null;
+  modal('<h2>Connect Grok</h2><div class="notice"><b>Easy setup — no API key and no Node.js.</b><br><br>G3DAI runs a tiny helper on your Windows computer and uses the official Grok browser login.</div><div class="field"><label>1. Start it</label><div class="notice">From the downloaded G3DAI folder, double-click <b>Start-G3DAI.bat</b>. Do not install Node.js.</div></div><div class="field"><label>2. Automatic setup</label><div class="notice">The launcher installs the official Grok CLI automatically if it is missing.</div></div><div class="field"><label>3. Sign in</label><div class="notice">Click <b>Sign in with Grok</b>. A normal Grok login opens in your browser. Sign in there.</div></div><div class="field"><label>4. Finish</label><div class="notice">Return here and click <b>Check connection</b>. When it says <b>Connected</b>, close this window and chat normally.</div></div><div class="field"><label>Nothing to enter</label><div class="notice">Never enter your Grok email, Grok password, xAI API key, token, or secret into G3DAI.</div></div><div class="actions"><button id="login" class="primary">Sign in with Grok</button><button id="check">Check connection</button><button id="close">Close</button></div><div id="loginInfo" class="subtle">Start-G3DAI.bat must be running.</div>');
+  $('login').onclick=async()=>{
+    try{
+      await api('/api/grok/login',{method:'POST'});
+      $('loginInfo').textContent='The official Grok sign-in opened. Finish signing in, then click Check connection.';
+      if(poll)clearInterval(poll);
+      poll=setInterval(async()=>{try{let d=await api('/api/grok/status');if(d.authenticated){clearInterval(poll);S.grok.connected=true;save();$('loginInfo').textContent='Connected!';$('status').textContent='Grok: connected'}}catch{}},2000);
+    }catch{$('loginInfo').textContent='Start-G3DAI.bat is not running. Close G3DAI and double-click it from the downloaded folder.'}
+  };
+  $('check').onclick=()=>refreshGrok();
+  $('close').onclick=()=>{if(poll)clearInterval(poll);$('modal').classList.remove('show')};
+}
+window.__g3daiOpenSettings=function(e){if(e){e.preventDefault();e.stopPropagation()}closeLeftMenu();modal('<h2>Settings</h2><button class="pill primary" id="newChatFromSettings" type="button">＋ New Chat</button><div class="field"><label>Appearance</label><select id="theme"><option value="dark">Dark mode</option><option value="light">Light mode</option></select></div><div class="field"><label>Grok connection</label><div class="card" style="margin:0"><div class="connect"><span><span class="dot" style="background:'+(S.grok.connected?'#62d18a':'#6d7c91')+'"></span><b>'+(S.grok.connected?'Connected':'Not connected')+'</b></span><button class="connectbtn" id="connect">Connect</button></div><div class="subtle">Uses official Grok browser sign-in. No API key is used or stored by G3DAI.</div></div></div><div class="field"><label>Printer</label><input id="pr" value="'+S.settings.printer+'"></div><div class="field"><label>Nozzle</label><input id="no" value="'+S.settings.nozzle+'"></div><div class="field"><label>Material</label><select id="ma"><option>PLA</option><option>TPU</option><option>PETG</option><option>ABS</option></select></div><button class="pill primary" id="saveSet">Save</button>');
+  $('newChatFromSettings').onclick=()=>window.__g3daiNewChat();$('theme').value=S.settings.theme||'dark';$('theme').onchange=()=>{S.settings.theme=$('theme').value;save();applyTheme()};
+  $('ma').value=S.settings.material;
+  $('connect').onclick=connectGrok;
+  $('saveSet').onclick=()=>{S.settings.printer=$('pr').value;S.settings.nozzle=$('no').value;S.settings.material=$('ma').value;save();$('modal').classList.remove('show');render();refreshGrok()};
+};
+const app=document.querySelector('.app');
+const sideMenu=document.querySelector('.side');
+const menuBackdrop=$('menuBackdrop');
+
+function syncMenus(){
+  S.ui=S.ui||{};
+  const closed=!!S.ui.leftClosed;
+  const rightClosed=typeof window.__g3daiRightClosed==='boolean'?window.__g3daiRightClosed:!!S.ui.rightClosed;
+  S.ui.rightClosed=rightClosed;
+  app.classList.toggle('left-closed',closed);
+  app.classList.toggle('left-open',!closed);
+  app.classList.toggle('right-closed',rightClosed);
+  $('menuToggle').setAttribute('aria-expanded',closed?'false':'true');
+  $('menuToggle').title=closed?'Open left menu':'Close left menu';
+  const rb=$('rightMenuToggle');
+  if(rb){
+    rb.setAttribute('aria-expanded',rightClosed?'false':'true');
+    rb.title=rightClosed?'Open right menu':'Close right menu';
+  }
+}
+
+function closeLeftMenu(){
+  S.ui=S.ui||{};
+  S.ui.leftClosed=true;
+  save();
+  syncMenus();
+}
+
+function toggleLeftMenu(){
+  S.ui=S.ui||{};
+  S.ui.leftClosed=!S.ui.leftClosed;
+  save();
+  syncMenus();
+}
+
+menuBackdrop.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  closeLeftMenu();
+});
+menuBackdrop.addEventListener('click',closeLeftMenu);
+
+document.addEventListener('pointerdown',e=>{
+  if(S.ui?.leftClosed)return;
+  if(sideMenu.contains(e.target)||$('menuToggle').contains(e.target))return;
+  closeLeftMenu();
+},true);
+
+function stopGeneration(){
+  if(!job)return;
+  job.cancel=true;
+  thinking=false;
+  job=null;
+  updateSendButton();
+  render();
+};
+$('prompt').addEventListener('keydown',e=>{
+  if(e.key==='Enter' && !e.shiftKey && !e.isComposing){
+    e.preventDefault();
+    if(window.__g3daiSend)window.__g3daiSend();
+  }
+});
+$('prompt').addEventListener('input',()=>{
+  $('prompt').style.height='auto';
+  $('prompt').style.height=Math.min($('prompt').scrollHeight,180)+'px';
+});
+$('search').onclick=()=>{closeLeftMenu();
+  let q=window.prompt('Search chats');
+  if(q){
+    alert(S.chats.filter(x=>x.title.toLowerCase().includes(q.toLowerCase())).map(x=>x.title).join('\n')||'No matches');
+  }
+};
+$('attach').onclick=()=>$('files').click();
+document.addEventListener('click',e=>{
+  const b=e.target.closest('#search,#projects,#settings');
+  if(b)setTimeout(closeLeftMenu,0);
+});
+$('files').onchange=()=>{
+  $('fileNames').textContent=[...$('files').files].map(x=>x.name).join(', ');
+};
+$('projects').onclick=()=>{closeLeftMenu();modal('<h2>Projects</h2><div class="notice">Chats and model history are saved in this browser. Grok handles your account login on grok.com.</div>')};
+window.__g3daiModuleReady=true;
+hydrateChats();
+window.__g3daiOpenChat=window.__g3daiOpenChat;
+window.addEventListener('pagehide',save);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save()});
+applyTheme();render();refreshGrok();
 </script></body></html>
